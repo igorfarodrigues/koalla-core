@@ -1,13 +1,27 @@
+# docker-compose.yml — desenvolvimento local
+# Em produção (Coolify) use apenas o Dockerfile.
+# O Coolify provisiona o Postgres como add-on separado.
+
 services:
   api:
-    build: .
+    build:
+      context: .
+      target: runtime
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://koalla:koalla@db:5432/koalla
+      WORKERS: "1"
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./app
+          target: /app/app
 
   db:
     image: postgres:16-alpine
@@ -17,7 +31,6 @@ services:
       POSTGRES_DB: koalla
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./migrations/initial_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U koalla"]
       interval: 5s
