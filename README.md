@@ -78,6 +78,9 @@ cp .env.example .env
 docker compose up --build
 ```
 
+> Se você ainda não criou o `.env`, o compose sobe com valores padrão seguros para desenvolvimento,
+> mas integrações como OpenAI e Chatwoot continuam exigindo credenciais válidas.
+
 A API sobe em `http://localhost:8000`. Docs em `/docs`.
 
 ## Variáveis de ambiente

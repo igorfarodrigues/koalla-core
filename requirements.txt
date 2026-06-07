@@ -15,7 +15,7 @@ alembic==1.14.0
 httpx==0.28.1
 
 # AI / LLM
-openai==1.57.4
+openai==1.58.1
 langchain==0.3.13
 langchain-openai==0.2.14
 langchain-community==0.3.13
