@@ -114,3 +114,7 @@ A API sobe em `http://localhost:8000`. Docs em `/docs`.
 | `GET` | `/transactions/user/{user_id}` | Lista transações do usuário |
 | `POST` | `/transactions/` | Cria transação manual |
 | `DELETE` | `/transactions/{id}` | Remove transação |
+
+## Guia para agentes de IA
+
+Consulte `ai-agents/README.md` para contexto de arquitetura, regras de negócio, engenharia/segurança e manual de testes.

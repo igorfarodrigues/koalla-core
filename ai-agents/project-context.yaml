@@ -1,0 +1,49 @@
+project:
+  name: koalla-core
+  language: python
+  runtime: "3.12"
+  framework: fastapi
+  database:
+    engine: postgresql
+    schema: koalla
+  integrations:
+    - chatwoot
+    - openai
+    - asaas
+
+entrypoints:
+  api:
+    file: app/main.py
+    routes:
+      - GET /health
+      - POST /webhook/chatwoot
+      - GET /users/{wa_id}
+      - PATCH /users/{user_id}/deactivate
+      - GET /transactions/user/{user_id}
+      - POST /transactions/
+      - DELETE /transactions/{id}
+
+critical_flows:
+  - name: chatwoot_webhook_pipeline
+    file: app/services/message_pipeline.py
+    stages:
+      - parse_event
+      - reset_or_test_commands
+      - message_filters
+      - message_type_resolution
+      - queue_debounce
+      - lock_conversation
+      - run_agent
+      - send_response
+      - unlock_conversation
+
+defaults:
+  local_compose:
+    db_url: postgresql+asyncpg://koalla:koalla@db:5432/koalla
+    workers: 1
+
+constraints:
+  - Não vazar segredos em código, logs ou docs.
+  - Preservar schema `koalla`.
+  - Priorizar erros explícitos em vez de falhas silenciosas.
+  - Evitar mudanças fora do escopo da tarefa.
