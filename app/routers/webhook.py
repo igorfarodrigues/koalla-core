@@ -2,7 +2,7 @@
 POST /webhook/chatwoot — receives Chatwoot webhook events.
 Mirrors the n8n webhook trigger node.
 """
-import asyncio
+
 from fastapi import APIRouter, Request, BackgroundTasks, HTTPException
 from app.schemas.chatwoot import ChatwootWebhookBody
 from app.services.message_pipeline import process_webhook

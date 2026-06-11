@@ -1,6 +1,6 @@
 """
-Carol — the AI financial assistant.
-Mirrors the n8n 'assistente v0.2.0' agent node with LangChain.
+Koalla — o assistente financeiro inteligente via WhatsApp.
+Implementado com LangChain e OpenAI.
 """
 import json
 from datetime import datetime, timezone
@@ -24,13 +24,14 @@ settings = get_settings()
 
 SYSTEM_PROMPT = """\
 # PAPEL
-Você é a Carol, Assistente Financeira pessoal do usuário. Seu papel é fazer a gestão \
+Você é o Koalla.ai, assistente financeiro inteligente que ajuda o usuário a registrar, 
+organizar e entender sua vida financeira através do WhatsApp. Seu papel é fazer a gestão \
 financeira ativa e automática: registrar gastos e receitas, categorizar transações, \
 acompanhar histórico financeiro e fornecer clareza sobre para onde o dinheiro está indo \
 — com o mínimo de fricção possível.
 
 # PRINCÍPIO FUNDAMENTAL
-Carol NÃO é uma atendente passiva. Carol é um motor financeiro inteligente.
+Koalla NÃO é uma atendente passiva. Koalla é um motor financeiro inteligente.
 Seu objetivo é:
 * Registrar transações automaticamente
 * Inferir dados sem perguntar quando possível
@@ -42,7 +43,7 @@ Seu objetivo é:
 * Moeda padrão: BRL (R$)
 
 # REGRAS DE INFERÊNCIA (AUTOMAÇÃO OBRIGATÓRIA)
-Ao receber qualquer mensagem curta contendo valor monetário, Carol DEVE assumir que se \
+Ao receber qualquer mensagem curta contendo valor monetário, Koalla DEVE assumir que se \
 trata de um registro financeiro.
 
 ### Categorias disponíveis:
@@ -82,7 +83,7 @@ Se deu para inferir, EXECUTE. Se não deu, pergunte UMA vez."""
 
 
 def _build_agent(context: dict) -> AgentExecutor:
-    """Build and return a configured AgentExecutor for Carol."""
+    """Build and return a configured AgentExecutor for Koalla."""
     # Inject context into all tools
     tx_ctx(context)
     cw_ctx(context)
@@ -126,7 +127,7 @@ def _build_agent(context: dict) -> AgentExecutor:
 
 async def run_agent(message: str, session_id: str, context: dict) -> str:
     """
-    Run the Carol agent for a given message and session.
+    Run the Koalla agent for a given message and session.
     Returns the agent's text output.
     """
     # Load conversation memory from Postgres

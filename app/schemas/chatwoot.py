@@ -1,13 +1,16 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Any
 
+#Linhas alteradas porque listas e dicionários default podem gerar comportamentos estranhos entre instâncias
+#Adicionado Field em from pydantic import
 
 class ChatwootSender(BaseModel):
     id: int | None = None
     name: str | None = None
     phone_number: str | None = None
     email: str | None = None
-    custom_attributes: dict[str, Any] = {}
+    #custom_attributes: dict[str, Any] = {}
+    custom_attributes: dict[str, Any] = Field(default_factory=dict)
 
 
 class ChatwootAttachment(BaseModel):
@@ -32,8 +35,10 @@ class ChatwootConversationMeta(BaseModel):
 
 class ChatwootConversation(BaseModel):
     id: int | None = None
-    labels: list[str] = []
-    custom_attributes: dict[str, Any] = {}
+    #labels: list[str] = []
+    labels: list[str] = Field(default_factory=list)
+    #custom_attributes: dict[str, Any] = {}
+    custom_attributes: dict[str, Any] = Field(default_factory=dict)
     contact_inbox: ChatwootContactInbox = ChatwootContactInbox()
     meta: ChatwootConversationMeta = ChatwootConversationMeta()
     messages: list[dict[str, Any]] = []
@@ -52,7 +57,8 @@ class ChatwootWebhookBody(BaseModel):
     created_at: str | None = None
     sender: ChatwootSender = ChatwootSender()
     conversation: ChatwootConversation = ChatwootConversation()
-    attachments: list[ChatwootAttachment] = []
+    #attachments: list[ChatwootAttachment] = []
+    attachments: list[ChatwootAttachment] = Field(default_factory=list)
     event: str | None = None
 
 

@@ -1,4 +1,4 @@
-"""LangChain tools for financial transaction management (Carol's core functions)."""
+"""Ferramentas financeiras principais do Koalla."""
 from langchain_core.tools import tool
 from typing import Annotated
 from datetime import datetime, timezone

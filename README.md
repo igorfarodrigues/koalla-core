@@ -1,6 +1,6 @@
 # koalla-core
 
-API backend da Carol, assistente financeira pessoal via WhatsApp. Recebe webhooks do Chatwoot, processa mensagens com um agente LLM e registra transações financeiras no PostgreSQL.
+API backend do Koalla, assistente financeira pessoal via WhatsApp. Recebe webhooks do Chatwoot, processa mensagens com um agente LLM e registra transações financeiras no PostgreSQL.
 
 ## Stack
 
@@ -32,7 +32,7 @@ app/
 │   └── users.py             # Leitura de usuários
 ├── services/
 │   ├── message_pipeline.py  # Pipeline completo (debounce → lock → agent → resposta)
-│   ├── agent_service.py     # Agente Carol (LangChain)
+│   ├── agent_service.py     # Agente Koalla (LangChain)
 │   ├── chatwoot_client.py   # Cliente HTTP Chatwoot
 │   ├── audio_service.py     # Transcrição via Whisper
 │   └── asaas_client.py      # Cliente HTTP Asaas
@@ -62,7 +62,7 @@ Enfileira → aguarda 100ms → verifica se é a última mensagem (debounce)
   ↓
 Verifica lock de conversa → bloqueia
   ↓
-Agente Carol (LangChain + gpt-4o-mini + memória Postgres)
+Agente Koalla (LangChain + gpt-4o-mini + memória Postgres)
   ↓
 Formata saída para WhatsApp → quebra em chunks → envia via Chatwoot
   ↓

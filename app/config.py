@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     ASAAS_API_KEY: str = ""
 
     # Agent config
-    MESSAGE_QUEUE_WAIT_SECONDS: float = 0.1
+    #MESSAGE_QUEUE_WAIT_SECONDS: float = 0.1
+    #Alterado o tempo de processo
+    MESSAGE_QUEUE_WAIT_SECONDS: float = 2.0
     AGENT_MAX_ITERATIONS: int = 10
     MEMORY_WINDOW_LENGTH: int = 100
 

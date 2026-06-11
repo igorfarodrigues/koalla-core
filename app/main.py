@@ -25,11 +25,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+#Permite que qualquer frontend na internet faça requisções na API.
+"""
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+)
+"""
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+    "https://koalla.ai",
+    "https://www.koalla.ai",
+    ]
 )
 
 app.include_router(webhook.router, prefix="/webhook", tags=["webhook"])

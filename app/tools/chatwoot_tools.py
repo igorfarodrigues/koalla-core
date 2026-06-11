@@ -1,4 +1,4 @@
-"""LangChain tools for Chatwoot interactions (used by the Carol agent)."""
+"""Ferramentas de integração com Chatwoot utilizadas pelo Koalla."""
 from langchain_core.tools import tool
 from typing import Annotated
 from app.services import chatwoot_client
