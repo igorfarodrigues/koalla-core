@@ -10,12 +10,15 @@ class Settings(BaseSettings):
     # OpenAI
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-4o-mini"
-    OPENAI_FORMATTING_MODEL: str = "gpt-4.1-mini"
+    OPENAI_FORMATTING_MODEL: str = "gpt-4.1-mini"   
 
     # Chatwoot
     CHATWOOT_URL: str = "https://chatwoot.koalla.ai"
     CHATWOOT_API_TOKEN: str
     CHATWOOT_ACCOUNT_ID: int = 1
+
+    # Segurança dos webhooks
+    CHATWOOT_WEBHOOK_SECRET: str = ""
 
     # Asaas
     ASAAS_URL: str = "https://api-sandbox.asaas.com"
