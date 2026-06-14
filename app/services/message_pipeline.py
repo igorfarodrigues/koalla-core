@@ -24,16 +24,11 @@ BLOCKED_LABELS = {"agente-off", "gestor", "testando-agente"}
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
-async def _get_or_create_user(wa_id: str, name: str | None, email: str | None) -> User:
+async def _get_user(wa_id: str) -> User | None:
+    """Retorna o usuário existente ou None. NÃO cria automaticamente."""
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).where(User.wa_id == wa_id))
-        user = result.scalars().first()
-        if not user:
-            user = User(wa_id=wa_id, full_name=name, email=email)
-            db.add(user)
-            await db.commit()
-            await db.refresh(user)
-        return user
+        return result.scalars().first()
 
 
 async def _enqueue_message(wa_id: str, message_id: str, message: str) -> None:
@@ -154,7 +149,6 @@ async def process_webhook(body: ChatwootWebhookBody) -> None:
     labels = set(body.conversation.labels)
     wa_id = body.conversation.meta.sender.phone_number or ""
     name = body.sender.name
-    email = body.sender.email
     content = body.content or ""
     message_id = str(body.id or "")
     account_id = body.account.id or settings.CHATWOOT_ACCOUNT_ID
@@ -194,8 +188,28 @@ async def process_webhook(body: ChatwootWebhookBody) -> None:
     if labels & BLOCKED_LABELS:
         return
 
-    # ── 5. Get/create user ────────────────────────────────────────────────
-    user = await _get_or_create_user(wa_id, name, email)
+    # ── 5. Gate: usuário deve estar cadastrado e ativo ────────────────────
+    user = await _get_user(wa_id)
+
+    if user is None:
+        if account_id and conversation_id:
+            await chatwoot_client.send_message(
+                account_id,
+                conversation_id,
+                "👋 Olá! Para usar o Koalla, cadastre-se em *koalla.ai*\n\n"
+                "É rápido e o primeiro acesso é grátis por 7 dias 🐨",
+            )
+        return
+
+    if not user.is_active:
+        if account_id and conversation_id:
+            await chatwoot_client.send_message(
+                account_id,
+                conversation_id,
+                "Sua assinatura está inativa. Para continuar usando o Koalla, "
+                "acesse *koalla.ai/planos* e escolha um plano 🐨",
+            )
+        return
 
     # ── 6. Resolve message text (text / file / audio) ─────────────────────
     file_info = ""

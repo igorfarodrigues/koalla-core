@@ -117,4 +117,4 @@ A API sobe em `http://localhost:8000`. Docs em `/docs`.
 
 ## Guia para agentes de IA
 
-Consulte `ai-agents/README.md` para contexto de arquitetura, regras de negócio, engenharia/segurança e manual de testes.
+Consulte `docs/README.md` para contexto de arquitetura, regras de negócio, engenharia/segurança e manual de testes.

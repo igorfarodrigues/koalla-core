@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy import text
 
-from app.routers import webhook, transactions, users
+from app.routers import webhook, transactions, users, auth
 from app.database import engine, Base
 
 
@@ -38,14 +38,17 @@ app.add_middleware(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-    "https://koalla.ai",
-    "https://www.koalla.ai",
-    ]
+        "https://koalla.ai",
+        "https://www.koalla.ai",
+    ],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(webhook.router, prefix="/webhook", tags=["webhook"])
 app.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
 app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 
 @app.get("/health")

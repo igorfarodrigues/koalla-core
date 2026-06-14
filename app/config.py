@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # Alert conversation (for human escalation notifications)
     ALERT_CONVERSATION_ID: str = ""
 
+    # WhatsApp público do Koalla (usado no link de onboarding do signup)
+    KOALLA_WA_NUMBER: str = "5531936185547"
+
     class Config:
         env_file = ".env"
         extra = "ignore"
