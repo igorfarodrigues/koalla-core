@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy import text
 
-from app.routers import webhook, transactions, users, auth
+from app.routers import webhook, transactions, users, auth, billing
 from app.database import engine, Base
 
 
@@ -49,6 +49,7 @@ app.include_router(webhook.router, prefix="/webhook", tags=["webhook"])
 app.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(billing.router, prefix="/webhook", tags=["billing"])
 
 
 @app.get("/health")

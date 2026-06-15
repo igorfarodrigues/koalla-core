@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     # Asaas
     ASAAS_URL: str = "https://api-sandbox.asaas.com"
     ASAAS_API_KEY: str = ""
+    ASAAS_WEBHOOK_TOKEN: str = ""   # token para validar webhooks do Asaas
+    TRIAL_DAYS: int = 15            # dias de trial gratuito (promo)
 
     # Agent config
     #MESSAGE_QUEUE_WAIT_SECONDS: float = 0.1
@@ -31,9 +33,14 @@ class Settings(BaseSettings):
     AGENT_MAX_ITERATIONS: int = 10
     MEMORY_WINDOW_LENGTH: int = 100
 
-    # Billing
+    # Billing (legacy — one-time charge via agent)
     CHARGE_VALUE: float = 500.0
     CHARGE_DURATION_MINUTES: int = 30
+
+    # Planos (valores em R$)
+    PLAN_STARTER_VALUE: float = 29.90
+    PLAN_PRO_VALUE: float = 79.90
+    PLAN_BUSINESS_VALUE: float = 99.90
 
     # Alert conversation (for human escalation notifications)
     ALERT_CONVERSATION_ID: str = ""
