@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     ASAAS_API_KEY: str = ""
     ASAAS_WEBHOOK_TOKEN: str = ""   # token para validar webhooks do Asaas
     TRIAL_DAYS: int = 15            # dias de trial gratuito (promo)
+    GRACE_HOURS: int = 48           # horas de carência após pagamento atrasado
 
     # Agent config
     #MESSAGE_QUEUE_WAIT_SECONDS: float = 0.1

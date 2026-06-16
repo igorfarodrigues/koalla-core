@@ -105,3 +105,50 @@ async def download_attachment(data_url: str) -> bytes:
         r = await client.get(data_url, headers=_headers(), follow_redirects=True)
         r.raise_for_status()
         return r.content
+
+
+async def search_contact_by_phone(account_id: int, phone: str) -> dict | None:
+    """
+    Busca um contato pelo número de telefone (wa_id).
+    Retorna o primeiro resultado ou None se não encontrado.
+    """
+    url = f"{_base(account_id)}/contacts/search"
+    async with httpx.AsyncClient() as client:
+        r = await client.get(url, headers=_headers(), params={"q": phone, "page": 1})
+        r.raise_for_status()
+        data = r.json()
+        results = data.get("payload", [])
+        return results[0] if results else None
+
+
+async def get_contact_conversations(account_id: int, contact_id: int) -> list[dict]:
+    """
+    Retorna as conversas de um contato, ordenadas por última atividade.
+    """
+    url = f"{_base(account_id)}/contacts/{contact_id}/conversations"
+    async with httpx.AsyncClient() as client:
+        r = await client.get(url, headers=_headers())
+        r.raise_for_status()
+        payload = r.json().get("payload", [])
+        # Ordena por last_activity_at desc para pegar a conversa mais recente
+        return sorted(payload, key=lambda c: c.get("last_activity_at", 0), reverse=True)
+
+
+async def send_message_to_phone(phone: str, content: str) -> bool:
+    """
+    Envia uma mensagem de texto para um número de telefone via a conversa mais recente no Chatwoot.
+    Retorna True se enviado com sucesso, False se o contato não foi encontrado.
+    """
+    account_id = settings.CHATWOOT_ACCOUNT_ID
+    contact = await search_contact_by_phone(account_id, phone)
+    if not contact:
+        return False
+
+    contact_id = contact["id"]
+    conversations = await get_contact_conversations(account_id, contact_id)
+    if not conversations:
+        return False
+
+    conversation_id = conversations[0]["id"]
+    await send_message(account_id, conversation_id, content)
+    return True

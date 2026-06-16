@@ -2,13 +2,18 @@
 POST /webhook/asaas — recebe eventos de billing do Asaas.
 
 Eventos tratados:
-  PAYMENT_CONFIRMED   → ativa user, marca invoice como paga
-  PAYMENT_RECEIVED    → idem (PIX usa esse evento)
-  PAYMENT_OVERDUE     → marca PAST_DUE (sem desativar imediatamente)
-  SUBSCRIPTION_DELETED → cancela subscription + desativa user
+  PAYMENT_CONFIRMED              → ativa user, marca invoice como paga
+  PAYMENT_RECEIVED               → idem (PIX usa esse evento)
+  PAYMENT_OVERDUE                → marca PAST_DUE (sem desativar imediatamente)
+  PAYMENT_CREDIT_CARD_CAPTURE_REFUSED → marca PAST_DUE (falha na cobrança recorrente)
+  SUBSCRIPTION_DELETED           → cancela subscription + desativa user
+  SUBSCRIPTION_INACTIVATED       → idem (inativação por falhas de pagamento)
+
+Idempotência:
+  Cada evento do Asaas carrega um campo "id" único (evt_...).
+  Usamos a tabela webhook_events para ignorar duplicatas silenciosamente.
 """
 import hmac
-import hashlib
 
 from fastapi import APIRouter, Request, Depends, HTTPException
 
@@ -22,6 +27,12 @@ settings = get_settings()
 
 # Eventos que confirmam pagamento
 PAYMENT_OK_EVENTS = {"PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"}
+
+# Eventos que marcam falha/atraso no pagamento
+PAYMENT_FAIL_EVENTS = {"PAYMENT_OVERDUE", "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED"}
+
+# Eventos que encerram a assinatura
+SUBSCRIPTION_END_EVENTS = {"SUBSCRIPTION_DELETED", "SUBSCRIPTION_INACTIVATED"}
 
 
 def _validate_asaas_token(request: Request) -> None:
@@ -56,27 +67,33 @@ async def asaas_webhook(
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
     event = data.get("event", "")
-    payment = data.get("payment", {})
+    event_id: str = data.get("id", "")  # ID único do evento (ex: evt_xxx&yyy)
 
+    # ── Idempotência ──────────────────────────────────────────────────────
+    # Retorna 200 imediatamente se este evento já foi processado
+    if event_id and await billing_service.is_event_already_processed(db, event_id):
+        return {"status": "duplicate", "event": event}
+
+    payment = data.get("payment", {})
     payment_id: str = payment.get("id", "")
     subscription_id: str | None = payment.get("subscription")
 
     # ── PAYMENT_CONFIRMED / PAYMENT_RECEIVED ──────────────────────────────
     if event in PAYMENT_OK_EVENTS:
         await billing_service.handle_payment_confirmed(db, payment_id, subscription_id)
-        return {"status": "ok", "event": event}
 
-    # ── PAYMENT_OVERDUE ───────────────────────────────────────────────────
-    if event == "PAYMENT_OVERDUE":
+    # ── PAYMENT_OVERDUE / PAYMENT_CREDIT_CARD_CAPTURE_REFUSED ────────────
+    elif event in PAYMENT_FAIL_EVENTS:
         await billing_service.handle_payment_overdue(db, payment_id, subscription_id)
-        return {"status": "ok", "event": event}
 
-    # ── SUBSCRIPTION_DELETED ──────────────────────────────────────────────
-    if event == "SUBSCRIPTION_DELETED":
+    # ── SUBSCRIPTION_DELETED / SUBSCRIPTION_INACTIVATED ──────────────────
+    elif event in SUBSCRIPTION_END_EVENTS:
         sub_id = data.get("subscription", {}).get("id") or subscription_id
         if sub_id:
             await billing_service.handle_subscription_deleted(db, sub_id)
-        return {"status": "ok", "event": event}
 
-    # Evento não tratado — retorna 200 para o Asaas não retentar
-    return {"status": "ignored", "event": event}
+    # Marca evento como processado (independente de ser tratado ou ignorado)
+    if event_id:
+        await billing_service.mark_event_processed(db, event_id, event)
+
+    return {"status": "ok", "event": event}

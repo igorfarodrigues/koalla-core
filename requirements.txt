@@ -24,6 +24,9 @@ langchain-postgres==0.0.12
 # Audio
 pydub==0.25.1
 
+# Scheduler (grace period expiry, tarefas periódicas)
+apscheduler==3.10.4
+
 # Utilities
 python-dotenv==1.0.1
 python-multipart==0.0.20

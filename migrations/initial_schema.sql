@@ -95,6 +95,7 @@ CREATE TABLE subscriptions (
     status sub_status DEFAULT 'TRIALING',
     plan_name VARCHAR(50),
     next_due_date DATE,
+    grace_expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -137,12 +138,23 @@ CREATE TABLE conversation_status (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ── WEBHOOK IDEMPOTENCY ────────────────────────────────────
+-- Armazena IDs de eventos já processados para evitar duplicatas (Asaas: at-least-once)
+CREATE TABLE webhook_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id VARCHAR(200) UNIQUE NOT NULL,
+    event_type VARCHAR(100) NOT NULL,
+    processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ── INDEXES ────────────────────────────────────────────────
 CREATE INDEX idx_trans_user_date ON transactions(user_id, created_at DESC);
 CREATE INDEX idx_wp_history_user ON wp_message_history(user_id, created_at DESC);
 CREATE INDEX idx_auth_token ON auth(magic_link_token);
 CREATE INDEX idx_message_queue_waid ON message_queue(wa_id);
 CREATE INDEX idx_chat_history_session ON chat_history(session_id);
+CREATE INDEX idx_webhook_events_id ON webhook_events(event_id);
+CREATE INDEX idx_sub_grace ON subscriptions(status, grace_expires_at) WHERE grace_expires_at IS NOT NULL;
 
 -- ── SEED: Default categories ───────────────────────────────
 INSERT INTO categories (name) VALUES

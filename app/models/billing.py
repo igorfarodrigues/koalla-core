@@ -44,6 +44,8 @@ class Subscription(Base):
     )
     plan_name: Mapped[str | None] = mapped_column(String(50))
     next_due_date: Mapped[date | None] = mapped_column(Date)
+    # Grace period: usuário permanece ativo até esta data mesmo com pagamento atrasado
+    grace_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -64,3 +66,17 @@ class Invoice(Base):
     pix_code: Mapped[str | None] = mapped_column(Text)
     payment_link: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class WebhookEvent(Base):
+    """
+    Registro de eventos de webhook já processados — garante idempotência.
+    O Asaas usa entrega "at least once": o mesmo evento pode chegar mais de uma vez.
+    """
+    __tablename__ = "webhook_events"
+    __table_args__ = {"schema": "koalla"}
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
