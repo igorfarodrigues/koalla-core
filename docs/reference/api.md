@@ -7,6 +7,18 @@ Production: https://api.koalla.ai
 Development: http://localhost:8080
 ```
 
+## Documentação Interativa (Swagger UI)
+
+A API possui documentação interativa via OpenAPI/Swagger:
+
+| Recurso | URL |
+|---------|-----|
+| **Swagger UI** | `/swagger-ui.html` |
+| **OpenAPI JSON** | `/v3/api-docs` |
+| **OpenAPI YAML** | `/v3/api-docs.yaml` |
+
+Acesse `http://localhost:8080/swagger-ui.html` para explorar e testar os endpoints.
+
 ## Authentication
 
 A API usa autenticação básica via header para endpoints administrativos.

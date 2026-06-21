@@ -5,6 +5,13 @@ import ai.koalla.core.dto.AsaasWebhookPayload
 import ai.koalla.core.dto.CancelSubscriptionResponse
 import ai.koalla.core.repository.UserRepository
 import ai.koalla.core.service.BillingService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.responses.ApiResponse
+import io.swagger.v3.oas.annotations.responses.ApiResponses
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.servlet.http.HttpServletRequest
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -14,21 +21,10 @@ import org.springframework.web.bind.annotation.*
 
 /**
  * POST /webhook/asaas — receives billing events from Asaas.
- *
- * Handled events:
- *   PAYMENT_CONFIRMED              → activates user, marks invoice as paid
- *   PAYMENT_RECEIVED               → same (PIX uses this event)
- *   PAYMENT_OVERDUE                → marks PAST_DUE (without immediate deactivation)
- *   PAYMENT_CREDIT_CARD_CAPTURE_REFUSED → marks PAST_DUE (recurring charge failure)
- *   SUBSCRIPTION_DELETED           → cancels subscription + deactivates user
- *   SUBSCRIPTION_INACTIVATED       → same (inactivation due to payment failures)
- *
- * Idempotency:
- *   Each Asaas event has a unique "id" field (evt_...).
- *   We use the webhook_events table to silently ignore duplicates.
  */
 @RestController
 @RequestMapping("/webhook")
+@Tag(name = "Webhooks", description = "Endpoints para receber webhooks de integrações externas")
 class BillingWebhookController(
     private val billingService: BillingService,
     private val userRepository: UserRepository,
@@ -37,19 +33,33 @@ class BillingWebhookController(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     companion object {
-        // Events that confirm payment
         val PAYMENT_OK_EVENTS = setOf("PAYMENT_CONFIRMED", "PAYMENT_RECEIVED")
-
-        // Events that mark payment failure/delay
         val PAYMENT_FAIL_EVENTS = setOf("PAYMENT_OVERDUE", "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED")
-
-        // Events that end the subscription
         val SUBSCRIPTION_END_EVENTS = setOf("SUBSCRIPTION_DELETED", "SUBSCRIPTION_INACTIVATED")
     }
 
     @PostMapping("/asaas")
+    @Operation(
+        summary = "Recebe webhooks do Asaas",
+        description = """
+            Endpoint que recebe eventos de cobrança do Asaas.
+            
+            **Eventos tratados:**
+            - PAYMENT_CONFIRMED / PAYMENT_RECEIVED → ativa usuário
+            - PAYMENT_OVERDUE / PAYMENT_CREDIT_CARD_CAPTURE_REFUSED → marca atraso
+            - SUBSCRIPTION_DELETED / SUBSCRIPTION_INACTIVATED → cancela assinatura
+            
+            **Idempotência:**
+            - Eventos duplicados são ignorados via webhook_events table
+        """
+    )
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Webhook processado"),
+        ApiResponse(responseCode = "401", description = "Token inválido")
+    ])
     fun asaasWebhook(
         @RequestBody payload: AsaasWebhookPayload,
+        @Parameter(description = "Token de autenticação Asaas")
         @RequestHeader("asaas-access-token", required = false) token: String?,
         request: HttpServletRequest
     ): ResponseEntity<Map<String, String>> {
@@ -96,7 +106,18 @@ class BillingWebhookController(
     }
 
     @PostMapping("/cancel-subscription/{waId}")
+    @Operation(
+        summary = "Cancelar assinatura",
+        description = "Cancela a assinatura de um usuário no Asaas e desativa a conta"
+    )
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Assinatura cancelada",
+            content = [Content(schema = Schema(implementation = CancelSubscriptionResponse::class))]),
+        ApiResponse(responseCode = "404", description = "Usuário não encontrado"),
+        ApiResponse(responseCode = "400", description = "Erro ao cancelar")
+    ])
     fun cancelSubscription(
+        @Parameter(description = "Número WhatsApp do usuário")
         @PathVariable waId: String
     ): ResponseEntity<Any> {
         val user = userRepository.findByWaId(waId)
@@ -126,4 +147,3 @@ class BillingWebhookController(
         return result == 0
     }
 }
-

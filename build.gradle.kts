@@ -50,6 +50,9 @@ dependencies {
 	// Scheduling
 	implementation("org.springframework.boot:spring-boot-starter-quartz")
 
+	// OpenAPI / Swagger UI
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
+
 	// Test
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-security-test")

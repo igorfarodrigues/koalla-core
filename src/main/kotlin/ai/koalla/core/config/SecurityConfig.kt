@@ -26,6 +26,9 @@ class SecurityConfig {
                     .requestMatchers("/health", "/actuator/health").permitAll()
                     .requestMatchers("/webhook/**").permitAll()
                     .requestMatchers("/auth/**").permitAll()
+                    // OpenAPI / Swagger UI
+                    .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
+                    .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
                     // Everything else requires authentication (future JWT)
                     .anyRequest().permitAll() // TODO: Change to authenticated() when JWT is implemented
             }
