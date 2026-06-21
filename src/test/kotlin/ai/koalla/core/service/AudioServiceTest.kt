@@ -6,18 +6,18 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class AudioServiceTest {
-
     // Create AudioService with a dummy API key for testing (external calls will be mocked or skipped)
     private val audioService = AudioService("test-api-key")
 
     @Nested
     inner class TranscribeTests {
         @Test
-        fun `should return empty audio message for empty bytes`() = runBlocking {
-            val result = audioService.transcribe(byteArrayOf())
+        fun `should return empty audio message for empty bytes`() =
+            runBlocking {
+                val result = audioService.transcribe(byteArrayOf())
 
-            result shouldBeEqualTo "<mensagem de áudio vazia>"
-        }
+                result shouldBeEqualTo "<mensagem de áudio vazia>"
+            }
     }
 
     @Nested
@@ -126,4 +126,3 @@ class AudioServiceTest {
         }
     }
 }
-

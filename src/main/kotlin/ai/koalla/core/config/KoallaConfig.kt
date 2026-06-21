@@ -23,32 +23,32 @@ data class KoallaProperties(
     val plans: PlansProperties = PlansProperties(),
     val alertConversationId: String = "",
     val koallaWaNumber: String = "5531936185547",
-    val formattingModel: String = "gpt-4.1-mini"
+    val formattingModel: String = "gpt-4.1-mini",
 )
 
 data class ChatwootProperties(
     val url: String = "https://chatwoot.koalla.ai",
     val apiToken: String = "",
     val accountId: Int = 1,
-    val webhookSecret: String = ""
+    val webhookSecret: String = "",
 )
 
 data class AsaasProperties(
     val url: String = "https://api-sandbox.asaas.com",
     val apiKey: String = "",
-    val webhookToken: String = ""
+    val webhookToken: String = "",
 )
 
 data class PlansProperties(
     val starter: BigDecimal = BigDecimal("29.90"),
     val pro: BigDecimal = BigDecimal("79.90"),
-    val business: BigDecimal = BigDecimal("99.90")
+    val business: BigDecimal = BigDecimal("99.90"),
 ) {
-    fun getValue(planName: String): BigDecimal = when (planName.uppercase()) {
-        "STARTER" -> starter
-        "PRO" -> pro
-        "BUSINESS" -> business
-        else -> BigDecimal.ZERO
-    }
+    fun getValue(planName: String): BigDecimal =
+        when (planName.uppercase()) {
+            "STARTER" -> starter
+            "PRO" -> pro
+            "BUSINESS" -> business
+            else -> BigDecimal.ZERO
+        }
 }
-

@@ -20,7 +20,7 @@ data class TransactionCreateRequest(
     val categoryId: Int? = null,
     val entityType: EntityContext = EntityContext.PF,
     val source: String = "whatsapp",
-    val occurredAt: OffsetDateTime? = null
+    val occurredAt: OffsetDateTime? = null,
 )
 
 data class TransactionResponse(
@@ -34,14 +34,14 @@ data class TransactionResponse(
     val source: String,
     val occurredAt: OffsetDateTime?,
     val createdAt: OffsetDateTime,
-    val updatedAt: OffsetDateTime
+    val updatedAt: OffsetDateTime,
 )
 
 data class TransactionSummary(
     val totalCashIn: Long,
     val totalCashOut: Long,
     val balance: Long,
-    val byCategory: Map<String, Long>
+    val byCategory: Map<String, Long>,
 )
 
 // ===================== User DTOs =====================
@@ -55,12 +55,11 @@ data class UserResponse(
     val lifetime: Boolean,
     val isActive: Boolean,
     val createdAt: OffsetDateTime,
-    val updateAt: OffsetDateTime
+    val updateAt: OffsetDateTime,
 )
 
 data class UserDeactivateResponse(
     val id: UUID,
     val isActive: Boolean,
-    val message: String
+    val message: String,
 )
-

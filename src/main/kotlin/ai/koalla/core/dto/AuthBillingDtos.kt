@@ -13,21 +13,17 @@ data class SignupRequest(
     @field:NotBlank
     @field:Pattern(regexp = "^\\d{10,15}$", message = "Invalid phone number")
     val waId: String,
-
     @field:NotBlank
     val fullName: String,
-
     @field:Email
     val email: String,
-
     @field:NotBlank
     @field:Pattern(regexp = "^(STARTER|PRO|BUSINESS)$", message = "Invalid plan")
     val plan: String,
-
     @field:Valid
     val card: CardData,
     @field:Valid
-    val cardHolderInfo: CardHolderInfo
+    val cardHolderInfo: CardHolderInfo,
 )
 
 data class CardData(
@@ -40,7 +36,7 @@ data class CardData(
     @field:NotBlank
     val expiryYear: String,
     @field:NotBlank
-    val ccv: String
+    val ccv: String,
 )
 
 data class CardHolderInfo(
@@ -52,22 +48,21 @@ data class CardHolderInfo(
     val cpfCnpj: String,
     val postalCode: String? = null,
     val addressNumber: String? = null,
-    val phone: String? = null
+    val phone: String? = null,
 )
 
 data class SignupResponse(
     val subscriptionId: String,
     val trialEndDate: String,
     val plan: String,
-    val waLink: String
+    val waLink: String,
 )
-
 
 // ===================== Billing DTOs =====================
 
 data class CancelSubscriptionResponse(
     val success: Boolean,
-    val subscriptionId: String?
+    val subscriptionId: String?,
 )
 
 /**
@@ -76,7 +71,7 @@ data class CancelSubscriptionResponse(
 data class TrialResult(
     val subscriptionId: String,
     val trialEndDate: String,
-    val plan: String
+    val plan: String,
 )
 
 /**
@@ -84,17 +79,17 @@ data class TrialResult(
  */
 data class CancelResult(
     val success: Boolean,
-    val subscriptionId: String?
+    val subscriptionId: String?,
 )
 
 // ===================== Asaas Webhook DTOs =====================
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class AsaasWebhookPayload(
-    val id: String = "",           // Asaas event ID (evt_xxx) — used for idempotency
+    val id: String = "", // Asaas event ID (evt_xxx) — used for idempotency
     val event: String,
     val payment: AsaasPayment? = null,
-    val subscription: AsaasSubscription? = null
+    val subscription: AsaasSubscription? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -105,13 +100,12 @@ data class AsaasPayment(
     val value: Double? = null,
     val status: String? = null,
     @JsonProperty("invoiceUrl")
-    val invoiceUrl: String? = null
+    val invoiceUrl: String? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class AsaasSubscription(
     val id: String,
     val customer: String? = null,
-    val status: String? = null
+    val status: String? = null,
 )
-

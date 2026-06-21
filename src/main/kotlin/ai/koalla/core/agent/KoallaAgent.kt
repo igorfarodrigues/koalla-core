@@ -1,13 +1,13 @@
 package ai.koalla.core.agent
 
 import ai.koalla.core.config.KoallaProperties
-import ai.koalla.core.repository.ChatHistoryRepository
 import ai.koalla.core.domain.AgentContext
+import ai.koalla.core.repository.ChatHistoryRepository
 import ai.koalla.core.tools.ToolContextHolder
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.slf4j.LoggerFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.Message
@@ -15,7 +15,6 @@ import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.stereotype.Component
-
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
@@ -37,12 +36,13 @@ class KoallaAgent(
     private val toolContextHolder: ToolContextHolder,
     private val props: KoallaProperties,
     private val objectMapper: ObjectMapper,
-    private val chatClientBuilder: ChatClient.Builder
+    private val chatClientBuilder: ChatClient.Builder,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     companion object {
-        private val SYSTEM_PROMPT = """
+        private val SYSTEM_PROMPT =
+            """
 # PAPEL
 Você é o Koalla.ai, assistente financeiro inteligente que ajuda o usuário a registrar,
 organizar e entender sua vida financeira através do WhatsApp. Seu papel é fazer a gestão
@@ -100,16 +100,17 @@ Só perguntar se faltar informação CRÍTICA (valor não identificado ou mensag
 
 # REGRA DE OURO
 Se deu para inferir, EXECUTE. Se não deu, pergunte UMA vez.
-        """.trimIndent()
+            """.trimIndent()
 
-        private val FORMATTING_PROMPT = """
+        private val FORMATTING_PROMPT =
+            """
 Você é especialista em formatação de mensagem para WhatsApp, trabalhando somente na formatação e não alterando o conteúdo da mensagem.
 - Substitua ** por *
 - Remova #
 - Remova emojis duplicados ou excessivos
 
 SUA SAÍDA DEVE SER SOMENTE A MENSAGEM FORMATADA.
-        """.trimIndent()
+            """.trimIndent()
     }
 
     // ChatClient with functions auto-configured via Spring AI
@@ -126,31 +127,39 @@ SUA SAÍDA DEVE SER SOMENTE A MENSAGEM FORMATADA.
      * and rely on ThreadLocal context. Pinning to an IO thread guarantees the
      * ThreadLocal set before the call is visible inside every tool invocation.
      */
-    suspend fun runAgent(message: String, sessionId: String, context: AgentContext): String? {
+    suspend fun runAgent(
+        message: String,
+        sessionId: String,
+        context: AgentContext,
+    ): String? {
         // Load history before entering IO context (avoids nested dispatchers)
-        val historyRecords = chatHistoryRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)
-            .takeLast(props.memoryWindowLength)
+        val historyRecords =
+            chatHistoryRepository
+                .findBySessionIdOrderByCreatedAtAsc(sessionId)
+                .takeLast(props.memoryWindowLength)
 
-        val chatHistory = historyRecords.mapNotNull { record ->
-            try {
-                @Suppress("UNCHECKED_CAST")
-                val msgData = objectMapper.readValue(record.message, Map::class.java) as Map<String, Any>
-                val role = msgData["role"] as? String
-                val content = msgData["content"] as? String ?: ""
-                when (role) {
-                    "user" -> UserMessage(content)
-                    "assistant" -> AssistantMessage(content)
-                    else -> null
+        val chatHistory =
+            historyRecords.mapNotNull { record ->
+                try {
+                    @Suppress("UNCHECKED_CAST")
+                    val msgData = objectMapper.readValue(record.message, Map::class.java) as Map<String, Any>
+                    val role = msgData["role"] as? String
+                    val content = msgData["content"] as? String ?: ""
+                    when (role) {
+                        "user" -> UserMessage(content)
+                        "assistant" -> AssistantMessage(content)
+                        else -> null
+                    }
+                } catch (e: Exception) {
+                    null
                 }
-            } catch (e: Exception) {
-                null
             }
-        }
 
-        val systemPrompt = SYSTEM_PROMPT.replace(
-            "{current_date}",
-            OffsetDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-        )
+        val systemPrompt =
+            SYSTEM_PROMPT.replace(
+                "{current_date}",
+                OffsetDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE),
+            )
 
         val messages = mutableListOf<Message>()
         messages.add(SystemMessage(systemPrompt))
@@ -162,10 +171,12 @@ SUA SAÍDA DEVE SER SOMENTE A MENSAGEM FORMATADA.
         return withContext(Dispatchers.IO) {
             toolContextHolder.set(context)
             try {
-                val response = chatClient.prompt()
-                    .messages(messages)
-                    .call()
-                    .content()
+                val response =
+                    chatClient
+                        .prompt()
+                        .messages(messages)
+                        .call()
+                        .content()
 
                 saveToHistory(sessionId, "user", message)
                 if (response != null) {
@@ -182,17 +193,24 @@ SUA SAÍDA DEVE SER SOMENTE A MENSAGEM FORMATADA.
         }
     }
 
-    private fun saveToHistory(sessionId: String, role: String, content: String) {
+    private fun saveToHistory(
+        sessionId: String,
+        role: String,
+        content: String,
+    ) {
         try {
-            val messageJson = objectMapper.writeValueAsString(mapOf(
-                "role" to role,
-                "content" to content
-            ))
+            val messageJson =
+                objectMapper.writeValueAsString(
+                    mapOf(
+                        "role" to role,
+                        "content" to content,
+                    ),
+                )
             chatHistoryRepository.save(
                 ai.koalla.core.entity.ChatHistory(
                     sessionId = sessionId,
-                    message = messageJson
-                )
+                    message = messageJson,
+                ),
             )
         } catch (e: Exception) {
             logger.warn("Failed to save chat history: ${e.message}")
@@ -212,11 +230,13 @@ SUA SAÍDA DEVE SER SOMENTE A MENSAGEM FORMATADA.
 
         return withContext(Dispatchers.IO) {
             try {
-                val response = chatClient.prompt()
-                    .system(FORMATTING_PROMPT)
-                    .user(text)
-                    .call()
-                    .content()
+                val response =
+                    chatClient
+                        .prompt()
+                        .system(FORMATTING_PROMPT)
+                        .user(text)
+                        .call()
+                        .content()
 
                 response?.trim() ?: text.trim()
             } catch (e: Exception) {

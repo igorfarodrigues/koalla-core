@@ -9,6 +9,5 @@ enum class SubscriptionStatus {
     ACTIVE,
     PAST_DUE,
     CANCELED,
-    EXPIRED
+    EXPIRED,
 }
-

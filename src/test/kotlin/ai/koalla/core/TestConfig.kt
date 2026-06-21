@@ -7,9 +7,8 @@ import org.springframework.context.annotation.Bean
 
 @TestConfiguration
 class TestConfig {
-
     @Bean
-    fun objectMapper(): ObjectMapper = ObjectMapper()
-        .registerModule(KotlinModule.Builder().build())
+    fun objectMapper(): ObjectMapper =
+        ObjectMapper()
+            .registerModule(KotlinModule.Builder().build())
 }
-

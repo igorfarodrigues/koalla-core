@@ -8,7 +8,6 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 class DomainModelsTest {
-
     @Nested
     inner class UserTests {
         @Test
@@ -16,17 +15,18 @@ class DomainModelsTest {
             val now = OffsetDateTime.now()
             val id = UUID.randomUUID()
 
-            val user = User(
-                id = id,
-                waId = "5511999999999",
-                fullName = "Test User",
-                email = "test@example.com",
-                planType = "PRO",
-                lifetime = false,
-                isActive = true,
-                createdAt = now,
-                updatedAt = now
-            )
+            val user =
+                User(
+                    id = id,
+                    waId = "5511999999999",
+                    fullName = "Test User",
+                    email = "test@example.com",
+                    planType = "PRO",
+                    lifetime = false,
+                    isActive = true,
+                    createdAt = now,
+                    updatedAt = now,
+                )
 
             user.id shouldBeEqualTo id
             user.waId shouldBeEqualTo "5511999999999"
@@ -55,17 +55,18 @@ class DomainModelsTest {
         @Test
         fun `should support copy with modifications`() {
             val now = OffsetDateTime.now()
-            val user = User(
-                id = UUID.randomUUID(),
-                waId = "123",
-                fullName = "Original",
-                email = null,
-                planType = "FREE",
-                lifetime = false,
-                isActive = true,
-                createdAt = now,
-                updatedAt = now
-            )
+            val user =
+                User(
+                    id = UUID.randomUUID(),
+                    waId = "123",
+                    fullName = "Original",
+                    email = null,
+                    planType = "FREE",
+                    lifetime = false,
+                    isActive = true,
+                    createdAt = now,
+                    updatedAt = now,
+                )
 
             val upgraded = user.copy(planType = "PRO", lifetime = true)
 
@@ -83,20 +84,21 @@ class DomainModelsTest {
             val id = UUID.randomUUID()
             val userId = UUID.randomUUID()
 
-            val transaction = Transaction(
-                id = id,
-                userId = userId,
-                description = "Test purchase",
-                amount = 5000L,
-                movement = MovementType.CASH_OUT,
-                categoryId = 1,
-                entityType = EntityContext.PF,
-                source = "whatsapp",
-                externalId = "ext-123",
-                occurredAt = now,
-                createdAt = now,
-                updatedAt = now
-            )
+            val transaction =
+                Transaction(
+                    id = id,
+                    userId = userId,
+                    description = "Test purchase",
+                    amount = 5000L,
+                    movement = MovementType.CASH_OUT,
+                    categoryId = 1,
+                    entityType = EntityContext.PF,
+                    source = "whatsapp",
+                    externalId = "ext-123",
+                    occurredAt = now,
+                    createdAt = now,
+                    updatedAt = now,
+                )
 
             transaction.id shouldBeEqualTo id
             transaction.userId shouldBeEqualTo userId
@@ -112,20 +114,21 @@ class DomainModelsTest {
         @Test
         fun `should allow null optional fields`() {
             val now = OffsetDateTime.now()
-            val transaction = Transaction(
-                id = UUID.randomUUID(),
-                userId = UUID.randomUUID(),
-                description = null,
-                amount = 1000L,
-                movement = MovementType.CASH_IN,
-                categoryId = null,
-                entityType = EntityContext.PF,
-                source = "api",
-                externalId = null,
-                occurredAt = null,
-                createdAt = now,
-                updatedAt = now
-            )
+            val transaction =
+                Transaction(
+                    id = UUID.randomUUID(),
+                    userId = UUID.randomUUID(),
+                    description = null,
+                    amount = 1000L,
+                    movement = MovementType.CASH_IN,
+                    categoryId = null,
+                    entityType = EntityContext.PF,
+                    source = "api",
+                    externalId = null,
+                    occurredAt = null,
+                    createdAt = now,
+                    updatedAt = now,
+                )
 
             transaction.description shouldBeEqualTo null
             transaction.categoryId shouldBeEqualTo null
@@ -140,18 +143,19 @@ class DomainModelsTest {
         fun `should create AgentContext with all fields`() {
             val userId = UUID.randomUUID()
 
-            val context = AgentContext(
-                userId = userId,
-                waId = "5511999999999",
-                accountId = 1,
-                conversationId = 100,
-                contactId = 50,
-                messageId = 500,
-                contactName = "John Doe",
-                labels = listOf("vip", "active"),
-                contactCustomAttributes = mapOf("plan" to "PRO"),
-                alertConversationId = "200"
-            )
+            val context =
+                AgentContext(
+                    userId = userId,
+                    waId = "5511999999999",
+                    accountId = 1,
+                    conversationId = 100,
+                    contactId = 50,
+                    messageId = 500,
+                    contactName = "John Doe",
+                    labels = listOf("vip", "active"),
+                    contactCustomAttributes = mapOf("plan" to "PRO"),
+                    alertConversationId = "200",
+                )
 
             context.userId shouldBeEqualTo userId
             context.waId shouldBeEqualTo "5511999999999"
@@ -170,18 +174,19 @@ class DomainModelsTest {
             val labels = mutableListOf("label1")
             val attrs = mutableMapOf<String, Any>("key" to "value")
 
-            val context = AgentContext(
-                userId = UUID.randomUUID(),
-                waId = "123",
-                accountId = 1,
-                conversationId = 1,
-                contactId = 1,
-                messageId = 1,
-                contactName = "Test",
-                labels = labels,
-                contactCustomAttributes = attrs,
-                alertConversationId = "1"
-            )
+            val context =
+                AgentContext(
+                    userId = UUID.randomUUID(),
+                    waId = "123",
+                    accountId = 1,
+                    conversationId = 1,
+                    contactId = 1,
+                    messageId = 1,
+                    contactName = "Test",
+                    labels = labels,
+                    contactCustomAttributes = attrs,
+                    alertConversationId = "1",
+                )
 
             // Original context should have initial values
             context.labels shouldBeEqualTo listOf("label1")
@@ -228,9 +233,14 @@ class DomainModelsTest {
         fun `should have all subscription status values`() {
             val statuses = SubscriptionStatus.entries
 
-            statuses.map { it.name } shouldBeEqualTo listOf(
-                "TRIALING", "ACTIVE", "PAST_DUE", "CANCELED", "EXPIRED"
-            )
+            statuses.map { it.name } shouldBeEqualTo
+                listOf(
+                    "TRIALING",
+                    "ACTIVE",
+                    "PAST_DUE",
+                    "CANCELED",
+                    "EXPIRED",
+                )
         }
 
         @Test
@@ -239,4 +249,3 @@ class DomainModelsTest {
         }
     }
 }
-

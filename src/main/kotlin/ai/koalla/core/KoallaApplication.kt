@@ -13,4 +13,3 @@ class KoallaApplication
 fun main(args: Array<String>) {
     runApplication<KoallaApplication>(*args)
 }
-

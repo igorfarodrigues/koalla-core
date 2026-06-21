@@ -1,8 +1,6 @@
 package ai.koalla.core.observability
 
-import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.Timer
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldBeGreaterThan
@@ -12,7 +10,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class PipelineMetricsTest {
-
     private lateinit var registry: MeterRegistry
     private lateinit var metrics: PipelineMetrics
 
@@ -49,9 +46,11 @@ class PipelineMetricsTest {
         fun `should increment counter with default text type`() {
             metrics.messageProcessed()
 
-            val counter = registry.find("koalla.messages.processed")
-                .tag("type", "text")
-                .counter()
+            val counter =
+                registry
+                    .find("koalla.messages.processed")
+                    .tag("type", "text")
+                    .counter()
 
             counter.shouldNotBeNull()
             counter.count() shouldBeEqualTo 1.0
@@ -61,9 +60,11 @@ class PipelineMetricsTest {
         fun `should increment counter with audio type`() {
             metrics.messageProcessed("audio")
 
-            val counter = registry.find("koalla.messages.processed")
-                .tag("type", "audio")
-                .counter()
+            val counter =
+                registry
+                    .find("koalla.messages.processed")
+                    .tag("type", "audio")
+                    .counter()
 
             counter.shouldNotBeNull()
             counter.count() shouldBeEqualTo 1.0
@@ -75,9 +76,11 @@ class PipelineMetricsTest {
             metrics.messageProcessed("text")
             metrics.messageProcessed("text")
 
-            val counter = registry.find("koalla.messages.processed")
-                .tag("type", "text")
-                .counter()
+            val counter =
+                registry
+                    .find("koalla.messages.processed")
+                    .tag("type", "text")
+                    .counter()
 
             counter.shouldNotBeNull()
             counter.count() shouldBeEqualTo 3.0
@@ -89,12 +92,16 @@ class PipelineMetricsTest {
             metrics.messageProcessed("text")
             metrics.messageProcessed("audio")
 
-            val textCounter = registry.find("koalla.messages.processed")
-                .tag("type", "text")
-                .counter()
-            val audioCounter = registry.find("koalla.messages.processed")
-                .tag("type", "audio")
-                .counter()
+            val textCounter =
+                registry
+                    .find("koalla.messages.processed")
+                    .tag("type", "text")
+                    .counter()
+            val audioCounter =
+                registry
+                    .find("koalla.messages.processed")
+                    .tag("type", "audio")
+                    .counter()
 
             textCounter.shouldNotBeNull()
             audioCounter.shouldNotBeNull()
@@ -109,9 +116,11 @@ class PipelineMetricsTest {
         fun `should increment counter with label reason`() {
             metrics.messageBlocked("label")
 
-            val counter = registry.find("koalla.messages.blocked")
-                .tag("reason", "label")
-                .counter()
+            val counter =
+                registry
+                    .find("koalla.messages.blocked")
+                    .tag("reason", "label")
+                    .counter()
 
             counter.shouldNotBeNull()
             counter.count() shouldBeEqualTo 1.0
@@ -121,9 +130,11 @@ class PipelineMetricsTest {
         fun `should increment counter with inactive reason`() {
             metrics.messageBlocked("inactive")
 
-            val counter = registry.find("koalla.messages.blocked")
-                .tag("reason", "inactive")
-                .counter()
+            val counter =
+                registry
+                    .find("koalla.messages.blocked")
+                    .tag("reason", "inactive")
+                    .counter()
 
             counter.shouldNotBeNull()
             counter.count() shouldBeEqualTo 1.0
@@ -133,9 +144,11 @@ class PipelineMetricsTest {
         fun `should increment counter with unregistered reason`() {
             metrics.messageBlocked("unregistered")
 
-            val counter = registry.find("koalla.messages.blocked")
-                .tag("reason", "unregistered")
-                .counter()
+            val counter =
+                registry
+                    .find("koalla.messages.blocked")
+                    .tag("reason", "unregistered")
+                    .counter()
 
             counter.shouldNotBeNull()
             counter.count() shouldBeEqualTo 1.0
@@ -150,15 +163,21 @@ class PipelineMetricsTest {
             metrics.messageBlocked("unregistered")
             metrics.messageBlocked("unregistered")
 
-            val labelCounter = registry.find("koalla.messages.blocked")
-                .tag("reason", "label")
-                .counter()
-            val inactiveCounter = registry.find("koalla.messages.blocked")
-                .tag("reason", "inactive")
-                .counter()
-            val unregisteredCounter = registry.find("koalla.messages.blocked")
-                .tag("reason", "unregistered")
-                .counter()
+            val labelCounter =
+                registry
+                    .find("koalla.messages.blocked")
+                    .tag("reason", "label")
+                    .counter()
+            val inactiveCounter =
+                registry
+                    .find("koalla.messages.blocked")
+                    .tag("reason", "inactive")
+                    .counter()
+            val unregisteredCounter =
+                registry
+                    .find("koalla.messages.blocked")
+                    .tag("reason", "unregistered")
+                    .counter()
 
             labelCounter!!.count() shouldBeEqualTo 2.0
             inactiveCounter!!.count() shouldBeEqualTo 1.0
@@ -200,9 +219,11 @@ class PipelineMetricsTest {
             metrics.messageProcessed("text")
             metrics.messageProcessed("text")
 
-            val counters = registry.find("koalla.messages.processed")
-                .tag("type", "text")
-                .counters()
+            val counters =
+                registry
+                    .find("koalla.messages.processed")
+                    .tag("type", "text")
+                    .counters()
 
             // Should only have one counter registered, not three
             counters.size shouldBeEqualTo 1
@@ -210,4 +231,3 @@ class PipelineMetricsTest {
         }
     }
 }
-

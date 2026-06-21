@@ -9,10 +9,8 @@ import org.springframework.test.context.ActiveProfiles
 @ActiveProfiles("test")
 @Import(TestConfig::class)
 class KoallaApplicationTests {
-
     @Test
     fun contextLoads() {
         // Basic smoke test to verify Spring context loads
     }
 }
-

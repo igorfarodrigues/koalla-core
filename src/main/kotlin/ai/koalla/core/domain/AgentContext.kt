@@ -17,5 +17,5 @@ data class AgentContext(
     val contactName: String,
     val labels: List<String>,
     val contactCustomAttributes: Map<String, Any>,
-    val alertConversationId: String
+    val alertConversationId: String,
 )

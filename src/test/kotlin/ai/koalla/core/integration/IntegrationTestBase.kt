@@ -36,7 +36,6 @@ import org.springframework.test.context.DynamicPropertySource
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 abstract class IntegrationTestBase {
-
     companion object {
         @JvmStatic
         protected lateinit var wireMockServer: WireMockServer
@@ -72,4 +71,3 @@ abstract class IntegrationTestBase {
         wireMockServer.resetAll()
     }
 }
-

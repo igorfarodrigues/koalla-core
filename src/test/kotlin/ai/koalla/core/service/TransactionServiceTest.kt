@@ -12,8 +12,6 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldBeGreaterThan
-import org.amshove.kluent.shouldContain
 import org.amshove.kluent.shouldHaveSize
 import org.amshove.kluent.shouldNotBeNull
 import org.junit.jupiter.api.BeforeEach
@@ -21,12 +19,10 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.data.domain.PageRequest
 import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import java.util.Optional
 import java.util.UUID
 
 class TransactionServiceTest {
-
     private lateinit var transactionRepository: TransactionRepository
     private lateinit var categoryRepository: CategoryRepository
     private lateinit var transactionService: TransactionService
@@ -45,16 +41,17 @@ class TransactionServiceTest {
             // Given
             val userId = UUID.randomUUID()
             val now = OffsetDateTime.now()
-            val request = TransactionCreateRequest(
-                userId = userId,
-                description = "Uber",
-                amount = 2500L,
-                movement = MovementType.CASH_OUT,
-                categoryId = 5,
-                entityType = EntityContext.PF,
-                source = "whatsapp",
-                occurredAt = now
-            )
+            val request =
+                TransactionCreateRequest(
+                    userId = userId,
+                    description = "Uber",
+                    amount = 2500L,
+                    movement = MovementType.CASH_OUT,
+                    categoryId = 5,
+                    entityType = EntityContext.PF,
+                    source = "whatsapp",
+                    occurredAt = now,
+                )
             val slot = slot<TransactionEntity>()
             every { transactionRepository.save(capture(slot)) } answers {
                 slot.captured.apply { id = UUID.randomUUID() }
@@ -79,12 +76,13 @@ class TransactionServiceTest {
         fun `should use current time when occurredAt is null`() {
             // Given
             val userId = UUID.randomUUID()
-            val request = TransactionCreateRequest(
-                userId = userId,
-                amount = 1000L,
-                movement = MovementType.CASH_IN,
-                occurredAt = null
-            )
+            val request =
+                TransactionCreateRequest(
+                    userId = userId,
+                    amount = 1000L,
+                    movement = MovementType.CASH_IN,
+                    occurredAt = null,
+                )
             val slot = slot<TransactionEntity>()
             every { transactionRepository.save(capture(slot)) } answers {
                 slot.captured.apply { id = UUID.randomUUID() }
@@ -104,10 +102,11 @@ class TransactionServiceTest {
         fun `should return transactions ordered by occurredAt desc`() {
             // Given
             val userId = UUID.randomUUID()
-            val entities = listOf(
-                createTransactionEntity(userId = userId, amount = 1000L),
-                createTransactionEntity(userId = userId, amount = 2000L)
-            )
+            val entities =
+                listOf(
+                    createTransactionEntity(userId = userId, amount = 1000L),
+                    createTransactionEntity(userId = userId, amount = 2000L),
+                )
             every {
                 transactionRepository.findByUserIdOrderByOccurredAtDesc(userId, PageRequest.of(0, 50))
             } returns entities
@@ -211,16 +210,18 @@ class TransactionServiceTest {
             val year = 2026
             val month = 6
 
-            val transactions = listOf(
-                createTransactionEntity(userId = userId, amount = 100000L, movement = MovementType.CASH_IN, categoryId = 1),
-                createTransactionEntity(userId = userId, amount = 25000L, movement = MovementType.CASH_OUT, categoryId = 2),
-                createTransactionEntity(userId = userId, amount = 15000L, movement = MovementType.CASH_OUT, categoryId = 2)
-            )
+            val transactions =
+                listOf(
+                    createTransactionEntity(userId = userId, amount = 100000L, movement = MovementType.CASH_IN, categoryId = 1),
+                    createTransactionEntity(userId = userId, amount = 25000L, movement = MovementType.CASH_OUT, categoryId = 2),
+                    createTransactionEntity(userId = userId, amount = 15000L, movement = MovementType.CASH_OUT, categoryId = 2),
+                )
 
-            val categories = listOf(
-                CategoryEntity(name = "Receita").apply { id = 1 },
-                CategoryEntity(name = "Alimentação").apply { id = 2 }
-            )
+            val categories =
+                listOf(
+                    CategoryEntity(name = "Receita").apply { id = 1 },
+                    CategoryEntity(name = "Alimentação").apply { id = 2 },
+                )
 
             every { transactionRepository.sumCashInByUserIdAndPeriod(userId, any(), any()) } returns 100000L
             every { transactionRepository.sumCashOutByUserIdAndPeriod(userId, any(), any()) } returns 40000L
@@ -262,10 +263,11 @@ class TransactionServiceTest {
         fun `should register transaction with category lookup`() {
             // Given
             val userId = UUID.randomUUID()
-            val categories = listOf(
-                CategoryEntity(name = "Alimentação").apply { id = 1 },
-                CategoryEntity(name = "Transporte").apply { id = 2 }
-            )
+            val categories =
+                listOf(
+                    CategoryEntity(name = "Alimentação").apply { id = 1 },
+                    CategoryEntity(name = "Transporte").apply { id = 2 },
+                )
             every { categoryRepository.findByUserIdIsNull() } returns categories
 
             val slot = slot<TransactionEntity>()
@@ -274,13 +276,14 @@ class TransactionServiceTest {
             }
 
             // When
-            val result = transactionService.registerTransaction(
-                userId = userId,
-                description = "Almoço",
-                amount = 3500L,
-                movement = MovementType.CASH_OUT,
-                categoryName = "alimentação"
-            )
+            val result =
+                transactionService.registerTransaction(
+                    userId = userId,
+                    description = "Almoço",
+                    amount = 3500L,
+                    movement = MovementType.CASH_OUT,
+                    categoryName = "alimentação",
+                )
 
             // Then
             result.shouldNotBeNull()
@@ -301,13 +304,14 @@ class TransactionServiceTest {
             }
 
             // When
-            val result = transactionService.registerTransaction(
-                userId = userId,
-                description = "Gasto",
-                amount = 1000L,
-                movement = MovementType.CASH_OUT,
-                categoryName = "Unknown"
-            )
+            val result =
+                transactionService.registerTransaction(
+                    userId = userId,
+                    description = "Gasto",
+                    amount = 1000L,
+                    movement = MovementType.CASH_OUT,
+                    categoryName = "Unknown",
+                )
 
             // Then
             result.categoryId shouldBeEqualTo null
@@ -323,12 +327,13 @@ class TransactionServiceTest {
             }
 
             // When
-            val result = transactionService.registerTransaction(
-                userId = userId,
-                description = "Receita",
-                amount = 50000L,
-                movement = MovementType.CASH_IN
-            )
+            val result =
+                transactionService.registerTransaction(
+                    userId = userId,
+                    description = "Receita",
+                    amount = 50000L,
+                    movement = MovementType.CASH_IN,
+                )
 
             // Then
             result.categoryId shouldBeEqualTo null
@@ -341,16 +346,16 @@ class TransactionServiceTest {
         userId: UUID = UUID.randomUUID(),
         amount: Long = 1000L,
         movement: MovementType = MovementType.CASH_OUT,
-        categoryId: Int? = null
-    ): TransactionEntity = TransactionEntity(
-        userId = userId,
-        amount = amount,
-        movement = movement,
-        categoryId = categoryId
-    ).apply {
-        this.id = id
-        this.createdAt = OffsetDateTime.now()
-        this.updatedAt = OffsetDateTime.now()
-    }
+        categoryId: Int? = null,
+    ): TransactionEntity =
+        TransactionEntity(
+            userId = userId,
+            amount = amount,
+            movement = movement,
+            categoryId = categoryId,
+        ).apply {
+            this.id = id
+            this.createdAt = OffsetDateTime.now()
+            this.updatedAt = OffsetDateTime.now()
+        }
 }
-

@@ -16,5 +16,5 @@ data class User(
     val lifetime: Boolean,
     val isActive: Boolean,
     val createdAt: OffsetDateTime,
-    val updatedAt: OffsetDateTime
+    val updatedAt: OffsetDateTime,
 )

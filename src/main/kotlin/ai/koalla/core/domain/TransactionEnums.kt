@@ -6,7 +6,7 @@ package ai.koalla.core.domain
  */
 enum class MovementType {
     CASH_IN,
-    CASH_OUT
+    CASH_OUT,
 }
 
 /**
@@ -14,5 +14,5 @@ enum class MovementType {
  */
 enum class EntityContext {
     PF,
-    PJ
+    PJ,
 }

@@ -9,7 +9,6 @@ import ai.koalla.core.entity.MessageQueue
 import ai.koalla.core.gateway.ChatwootGateway
 import ai.koalla.core.observability.PipelineMetrics
 import ai.koalla.core.repository.*
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -18,6 +17,7 @@ import org.slf4j.MDC
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.OffsetDateTime
+import java.util.concurrent.TimeUnit
 
 /**
  * Core message processing pipeline.
@@ -35,7 +35,7 @@ class MessagePipelineService(
     private val audioService: AudioService,
     private val props: KoallaProperties,
     private val applicationScope: CoroutineScope,
-    private val metrics: PipelineMetrics
+    private val metrics: PipelineMetrics,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -78,8 +78,17 @@ class MessagePipelineService(
 
         try {
             doProcessWithContext(
-                messageType, labels, waId, name, content, messageId,
-                accountId, conversationId, contactId, contactAttrs, body
+                messageType,
+                labels,
+                waId,
+                name,
+                content,
+                messageId,
+                accountId,
+                conversationId,
+                contactId,
+                contactAttrs,
+                body,
             )
         } finally {
             MDC.remove("waId")
@@ -99,7 +108,7 @@ class MessagePipelineService(
         conversationId: Int?,
         contactId: Int?,
         contactAttrs: Map<String, Any>,
-        body: ChatwootWebhookBody
+        body: ChatwootWebhookBody,
     ) {
         val sessionId = waId
 
@@ -131,9 +140,10 @@ class MessagePipelineService(
             metrics.messageBlocked("unregistered")
             if (conversationId != null) {
                 chatwootGateway.sendMessage(
-                    accountId, conversationId,
+                    accountId,
+                    conversationId,
                     "👋 Olá! Para usar o Koalla, cadastre-se em *koalla.ai*\n\n" +
-                    "É rápido e o primeiro acesso é grátis por 7 dias 🐨"
+                        "É rápido e o primeiro acesso é grátis por 7 dias 🐨",
                 )
             }
             return
@@ -143,9 +153,10 @@ class MessagePipelineService(
             metrics.messageBlocked("inactive")
             if (conversationId != null) {
                 chatwootGateway.sendMessage(
-                    accountId, conversationId,
+                    accountId,
+                    conversationId,
                     "Sua assinatura está inativa. Para continuar usando o Koalla, " +
-                    "acesse *koalla.ai/planos* e escolha um plano 🐨"
+                        "acesse *koalla.ai/planos* e escolha um plano 🐨",
                 )
             }
             return
@@ -162,6 +173,7 @@ class MessagePipelineService(
             if (!att.isNullOrEmpty()) {
                 @Suppress("UNCHECKED_CAST")
                 val firstAtt = att.first() as? Map<String, Any>
+
                 @Suppress("UNCHECKED_CAST")
                 val meta = firstAtt?.get("meta") as? Map<String, Any>
                 isAudio = meta?.get("is_recorded_audio") as? Boolean ?: false
@@ -218,40 +230,50 @@ class MessagePipelineService(
         }
 
         // ── 12. Build agent context ───────────────────────────────────────────
-        val contactData = if (contactId != null) {
-            try { chatwootGateway.getContact(accountId, contactId) } catch (e: Exception) { null }
-        } else null
+        val contactData =
+            if (contactId != null) {
+                try {
+                    chatwootGateway.getContact(accountId, contactId)
+                } catch (e: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
 
         @Suppress("UNCHECKED_CAST")
-        val contactCustomAttrs = (contactData?.get("payload") as? Map<String, Any>)
-            ?.get("custom_attributes") as? Map<String, Any> ?: contactAttrs
+        val contactCustomAttrs =
+            (contactData?.get("payload") as? Map<String, Any>)
+                ?.get("custom_attributes") as? Map<String, Any> ?: contactAttrs
 
-        val agentContext = AgentContext(
-            userId = user.id,
-            waId = waId,
-            accountId = accountId,
-            conversationId = conversationId ?: 0,
-            contactId = contactId ?: 0,
-            messageId = messageId.toIntOrNull() ?: 0,
-            contactName = name ?: user.waId,
-            labels = labels.toList(),
-            contactCustomAttributes = contactCustomAttrs,
-            alertConversationId = props.alertConversationId
-        )
+        val agentContext =
+            AgentContext(
+                userId = user.id,
+                waId = waId,
+                accountId = accountId,
+                conversationId = conversationId ?: 0,
+                contactId = contactId ?: 0,
+                messageId = messageId.toIntOrNull() ?: 0,
+                contactName = name ?: user.waId,
+                labels = labels.toList(),
+                contactCustomAttributes = contactCustomAttrs,
+                alertConversationId = props.alertConversationId,
+            )
 
         // ── 13. Run agent ─────────────────────────────────────────────────────
         val msgType = if (isAudio) "audio" else "text"
         metrics.messageProcessed(msgType)
 
         val agentStart = System.nanoTime()
-        val output = try {
-            koallaAgent.runAgent(combinedMessage, sessionId, agentContext)
-        } catch (e: Exception) {
-            unlockConversation(sessionId)
-            throw e
-        } finally {
-            metrics.agentTimer.record(System.nanoTime() - agentStart, TimeUnit.NANOSECONDS)
-        }
+        val output =
+            try {
+                koallaAgent.runAgent(combinedMessage, sessionId, agentContext)
+            } catch (e: Exception) {
+                unlockConversation(sessionId)
+                throw e
+            } finally {
+                metrics.agentTimer.record(System.nanoTime() - agentStart, TimeUnit.NANOSECONDS)
+            }
 
         if (output.isNullOrEmpty() || output == "Agent stopped due to max iterations.") {
             unlockConversation(sessionId)
@@ -275,22 +297,24 @@ class MessagePipelineService(
     // ── Helper methods ────────────────────────────────────────────────────────
 
     @Transactional
-    fun enqueueMessage(waId: String, messageId: String, message: String) {
+    fun enqueueMessage(
+        waId: String,
+        messageId: String,
+        message: String,
+    ) {
         messageQueueRepository.save(
-            MessageQueue(waId = waId, messageId = messageId, message = message, timestamp = OffsetDateTime.now())
+            MessageQueue(waId = waId, messageId = messageId, message = message, timestamp = OffsetDateTime.now()),
         )
     }
 
-    fun fetchQueue(waId: String): List<MessageQueue> =
-        messageQueueRepository.findByWaIdOrderByTimestampAsc(waId)
+    fun fetchQueue(waId: String): List<MessageQueue> = messageQueueRepository.findByWaIdOrderByTimestampAsc(waId)
 
     @Transactional
     fun clearQueue(waId: String) {
         messageQueueRepository.deleteByWaId(waId)
     }
 
-    fun getStatus(sessionId: String): ConversationStatus? =
-        conversationStatusRepository.findBySessionId(sessionId)
+    fun getStatus(sessionId: String): ConversationStatus? = conversationStatusRepository.findBySessionId(sessionId)
 
     @Transactional
     fun lockConversation(sessionId: String) {
@@ -303,7 +327,7 @@ class MessagePipelineService(
             conversationStatusRepository.save(existing)
         } else {
             conversationStatusRepository.save(
-                ConversationStatus(sessionId = sessionId, lockConversa = true, aguardandoFollowup = true, numeroFollowup = 0)
+                ConversationStatus(sessionId = sessionId, lockConversa = true, aguardandoFollowup = true, numeroFollowup = 0),
             )
         }
     }
@@ -318,13 +342,16 @@ class MessagePipelineService(
             conversationStatusRepository.save(existing)
         } else {
             conversationStatusRepository.save(
-                ConversationStatus(sessionId = sessionId, lockConversa = false, aguardandoFollowup = false, numeroFollowup = 0)
+                ConversationStatus(sessionId = sessionId, lockConversa = false, aguardandoFollowup = false, numeroFollowup = 0),
             )
         }
     }
 
     @Transactional
-    suspend fun resetConversation(sessionId: String, body: ChatwootWebhookBody) {
+    suspend fun resetConversation(
+        sessionId: String,
+        body: ChatwootWebhookBody,
+    ) {
         val accountId = body.account.id
         val conversationId = body.conversation.id
         val contactId = body.conversation.contactInbox.contactId
@@ -335,8 +362,9 @@ class MessagePipelineService(
 
         if (accountId != null && contactId != null) {
             chatwootGateway.destroyContactAttributes(
-                accountId, contactId,
-                listOf("preferencia_audio_texto", "asaas_id_cliente", "asaas_id_cobranca", "asaas_status_cobranca")
+                accountId,
+                contactId,
+                listOf("preferencia_audio_texto", "asaas_id_cliente", "asaas_id_cobranca", "asaas_status_cobranca"),
             )
         }
 
@@ -347,7 +375,10 @@ class MessagePipelineService(
         }
     }
 
-    fun splitMessage(text: String, maxLen: Int = 4096): List<String> {
+    fun splitMessage(
+        text: String,
+        maxLen: Int = 4096,
+    ): List<String> {
         if (text.length <= maxLen) return listOf(text)
 
         val chunks = mutableListOf<String>()

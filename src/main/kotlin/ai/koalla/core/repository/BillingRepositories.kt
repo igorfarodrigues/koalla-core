@@ -17,24 +17,28 @@ interface AsaasCustomerRepository : JpaRepository<AsaasCustomer, UUID> {
 interface SubscriptionRepository : JpaRepository<Subscription, UUID> {
     fun findByAsaasSubscriptionId(asaasSubscriptionId: String): Subscription?
 
-    @Query("""
+    @Query(
+        """
         SELECT s FROM Subscription s
         WHERE s.userId = :userId
         AND s.status IN (:statuses)
-    """)
+    """,
+    )
     fun findActiveByUserId(
         @Param("userId") userId: UUID,
-        @Param("statuses") statuses: Collection<SubStatus> = listOf(SubStatus.ACTIVE, SubStatus.TRIALING, SubStatus.PAST_DUE)
+        @Param("statuses") statuses: Collection<SubStatus> = listOf(SubStatus.ACTIVE, SubStatus.TRIALING, SubStatus.PAST_DUE),
     ): Subscription?
 
-    @Query("""
+    @Query(
+        """
         SELECT s FROM Subscription s
         WHERE s.status = :status
         AND s.graceExpiresAt <= :now
-    """)
+    """,
+    )
     fun findExpiredGracePeriods(
         @Param("now") now: OffsetDateTime,
-        @Param("status") status: SubStatus = SubStatus.PAST_DUE
+        @Param("status") status: SubStatus = SubStatus.PAST_DUE,
     ): List<Subscription>
 }
 
@@ -47,4 +51,3 @@ interface InvoiceRepository : JpaRepository<Invoice, UUID> {
 interface WebhookEventRepository : JpaRepository<WebhookEvent, UUID> {
     fun existsByEventId(eventId: String): Boolean
 }
-

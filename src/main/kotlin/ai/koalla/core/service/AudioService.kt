@@ -16,15 +16,17 @@ import org.springframework.web.reactive.function.client.awaitBody
  */
 @Service
 class AudioService(
-    @Value("\${spring.ai.openai.api-key}") private val openaiApiKey: String
+    @Value("\${spring.ai.openai.api-key}") private val openaiApiKey: String,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val webClient = WebClient.builder()
-        .baseUrl("https://api.openai.com/v1")
-        .defaultHeader("Authorization", "Bearer $openaiApiKey")
-        .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) } // 16MB for audio files
-        .build()
+    private val webClient =
+        WebClient
+            .builder()
+            .baseUrl("https://api.openai.com/v1")
+            .defaultHeader("Authorization", "Bearer $openaiApiKey")
+            .codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) } // 16MB for audio files
+            .build()
 
     /**
      * Transcribe audio bytes using OpenAI Whisper API.
@@ -46,18 +48,24 @@ class AudioService(
             val (filename, contentType) = detectAudioFormat(audioBytes)
 
             val bodyBuilder = MultipartBodyBuilder()
-            bodyBuilder.part("file", object : ByteArrayResource(audioBytes) {
-                override fun getFilename(): String = filename
-            }).contentType(MediaType.parseMediaType(contentType))
+            bodyBuilder
+                .part(
+                    "file",
+                    object : ByteArrayResource(audioBytes) {
+                        override fun getFilename(): String = filename
+                    },
+                ).contentType(MediaType.parseMediaType(contentType))
             bodyBuilder.part("model", "whisper-1")
             bodyBuilder.part("language", "pt")
 
-            val response = webClient.post()
-                .uri("/audio/transcriptions")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(bodyBuilder.build()))
-                .retrieve()
-                .awaitBody<WhisperResponse>()
+            val response =
+                webClient
+                    .post()
+                    .uri("/audio/transcriptions")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(BodyInserters.fromMultipartData(bodyBuilder.build()))
+                    .retrieve()
+                    .awaitBody<WhisperResponse>()
 
             val text = response.text?.trim()
             if (text.isNullOrBlank()) {
@@ -77,8 +85,8 @@ class AudioService(
      * Detect audio format from magic bytes.
      * Returns (filename, contentType) tuple.
      */
-    private fun detectAudioFormat(bytes: ByteArray): Pair<String, String> {
-        return when {
+    private fun detectAudioFormat(bytes: ByteArray): Pair<String, String> =
+        when {
             // OGG format (used by WhatsApp voice messages)
             bytes.size >= 4 && bytes.slice(0..3) == listOf<Byte>(0x4F, 0x67, 0x67, 0x53) ->
                 "audio.ogg" to "audio/ogg"
@@ -100,10 +108,8 @@ class AudioService(
             // Default to ogg (most common for WhatsApp)
             else -> "audio.ogg" to "audio/ogg"
         }
-    }
 
     data class WhisperResponse(
-        val text: String? = null
+        val text: String? = null,
     )
 }
-

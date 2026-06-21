@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component
  */
 @Component
 class ToolContextHolder {
-
     private val contextHolder = ThreadLocal<AgentContext>()
 
     fun set(context: AgentContext) {
@@ -19,11 +18,11 @@ class ToolContextHolder {
 
     fun get(): AgentContext? = contextHolder.get()
 
-    fun require(): AgentContext = contextHolder.get()
-        ?: throw IllegalStateException("Agent context not set. Ensure context is set before tool invocation.")
+    fun require(): AgentContext =
+        contextHolder.get()
+            ?: throw IllegalStateException("Agent context not set. Ensure context is set before tool invocation.")
 
     fun clear() {
         contextHolder.remove()
     }
 }
-

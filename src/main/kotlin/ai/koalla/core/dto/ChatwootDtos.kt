@@ -16,7 +16,7 @@ data class ChatwootSender(
     val phoneNumber: String? = null,
     val email: String? = null,
     @JsonProperty("custom_attributes")
-    val customAttributes: Map<String, Any> = emptyMap()
+    val customAttributes: Map<String, Any> = emptyMap(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -26,7 +26,7 @@ data class ChatwootAttachment(
     val fileType: String? = null,
     @JsonProperty("data_url")
     val dataUrl: String? = null,
-    val meta: Map<String, Any> = emptyMap()
+    val meta: Map<String, Any> = emptyMap(),
 ) {
     val isRecordedAudio: Boolean
         get() = meta["is_recorded_audio"] as? Boolean ?: false
@@ -37,12 +37,12 @@ data class ChatwootContactInbox(
     @JsonProperty("contact_id")
     val contactId: Int? = null,
     @JsonProperty("source_id")
-    val sourceId: String? = null
+    val sourceId: String? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class ChatwootConversationMeta(
-    val sender: ChatwootSender = ChatwootSender()
+    val sender: ChatwootSender = ChatwootSender(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -54,13 +54,13 @@ data class ChatwootConversation(
     @JsonProperty("contact_inbox")
     val contactInbox: ChatwootContactInbox = ChatwootContactInbox(),
     val meta: ChatwootConversationMeta = ChatwootConversationMeta(),
-    val messages: List<Map<String, Any>> = emptyList()
+    val messages: List<Map<String, Any>> = emptyList(),
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class ChatwootAccount(
     val id: Int? = null,
-    val name: String? = null
+    val name: String? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -75,12 +75,11 @@ data class ChatwootWebhookBody(
     val sender: ChatwootSender = ChatwootSender(),
     val conversation: ChatwootConversation = ChatwootConversation(),
     val attachments: List<ChatwootAttachment> = emptyList(),
-    val event: String? = null
+    val event: String? = null,
 )
 
 // Response DTOs
 data class WebhookResponse(
     val status: String,
-    val event: String? = null
+    val event: String? = null,
 )
-

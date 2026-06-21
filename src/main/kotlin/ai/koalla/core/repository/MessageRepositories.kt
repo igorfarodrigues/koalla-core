@@ -30,4 +30,3 @@ interface ChatHistoryRepository : JpaRepository<ChatHistory, Long> {
 interface ConversationStatusRepository : JpaRepository<ConversationStatus, String> {
     fun findBySessionId(sessionId: String): ConversationStatus?
 }
-

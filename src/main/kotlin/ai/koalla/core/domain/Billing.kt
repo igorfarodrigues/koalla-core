@@ -17,7 +17,7 @@ data class Subscription(
     val planName: String?,
     val nextDueDate: LocalDate?,
     val graceExpiresAt: OffsetDateTime?,
-    val createdAt: OffsetDateTime
+    val createdAt: OffsetDateTime,
 )
 
 /**
@@ -33,7 +33,7 @@ data class Invoice(
     val status: String?,
     val pixCode: String?,
     val paymentLink: String?,
-    val createdAt: OffsetDateTime
+    val createdAt: OffsetDateTime,
 )
 
 /**
@@ -43,6 +43,5 @@ data class Invoice(
 data class AsaasCustomerMapping(
     val userId: UUID,
     val asaasCustomerId: String,
-    val createdAt: OffsetDateTime
+    val createdAt: OffsetDateTime,
 )
-

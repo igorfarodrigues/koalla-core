@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.*
 class BillingWebhookController(
     private val billingService: BillingService,
     private val userService: UserService,
-    private val props: KoallaProperties
+    private val props: KoallaProperties,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -50,21 +50,24 @@ class BillingWebhookController(
             - SUBSCRIPTION_DELETED / SUBSCRIPTION_INACTIVATED → cancela assinatura
 
             Idempotência garantida via webhook_events table.
-        """
+        """,
     )
-    @ApiResponses(value = [
-        ApiResponse(responseCode = "200", description = "Webhook processado"),
-        ApiResponse(responseCode = "401", description = "Token inválido")
-    ])
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Webhook processado"),
+            ApiResponse(responseCode = "401", description = "Token inválido"),
+        ],
+    )
     fun asaasWebhook(
         @RequestBody payload: AsaasWebhookPayload,
         @Parameter(description = "Token de autenticação Asaas")
         @RequestHeader("asaas-access-token", required = false) token: String?,
-        request: HttpServletRequest
+        request: HttpServletRequest,
     ): ResponseEntity<Map<String, String>> {
         if (props.asaas.webhookToken.isNotEmpty()) {
             if (token == null || !secureCompare(token, props.asaas.webhookToken)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
                     .body(mapOf("error" to "Invalid webhook token"))
             }
         }
@@ -98,20 +101,25 @@ class BillingWebhookController(
     @PostMapping("/cancel-subscription/{waId}")
     @Operation(
         summary = "Cancelar assinatura",
-        description = "Cancela a assinatura de um usuário no Asaas e desativa a conta. Requer X-Koalla-Secret."
+        description = "Cancela a assinatura de um usuário no Asaas e desativa a conta. Requer X-Koalla-Secret.",
     )
-    @ApiResponses(value = [
-        ApiResponse(responseCode = "200", description = "Assinatura cancelada",
-            content = [Content(schema = Schema(implementation = CancelSubscriptionResponse::class))]),
-        ApiResponse(responseCode = "401", description = "Secret inválido ou ausente"),
-        ApiResponse(responseCode = "404", description = "Usuário não encontrado"),
-        ApiResponse(responseCode = "400", description = "Sem assinatura ativa")
-    ])
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Assinatura cancelada",
+                content = [Content(schema = Schema(implementation = CancelSubscriptionResponse::class))],
+            ),
+            ApiResponse(responseCode = "401", description = "Secret inválido ou ausente"),
+            ApiResponse(responseCode = "404", description = "Usuário não encontrado"),
+            ApiResponse(responseCode = "400", description = "Sem assinatura ativa"),
+        ],
+    )
     fun cancelSubscription(
         @Parameter(description = "Número WhatsApp do usuário")
         @PathVariable waId: String,
         @Parameter(description = "Secret de autenticação")
-        @RequestHeader("X-Koalla-Secret", required = false) secret: String?
+        @RequestHeader("X-Koalla-Secret", required = false) secret: String?,
     ): ResponseEntity<CancelSubscriptionResponse> {
         if (!secureCompare(secret ?: "", props.chatwoot.webhookSecret)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
@@ -124,7 +132,7 @@ class BillingWebhookController(
         val result = billingService.cancelUserSubscription(user)
 
         return ResponseEntity.ok(
-            CancelSubscriptionResponse(success = result.success, subscriptionId = result.subscriptionId)
+            CancelSubscriptionResponse(success = result.success, subscriptionId = result.subscriptionId),
         )
     }
 }

@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class KoallaExceptionsTest {
-
     @Nested
     inner class UserNotFoundExceptionTests {
         @Test
@@ -107,14 +106,15 @@ class KoallaExceptionsTest {
     inner class HierarchyTests {
         @Test
         fun `all exceptions should extend KoallaException`() {
-            val exceptions = listOf(
-                UserNotFoundException("test"),
-                UserInactiveException("test"),
-                SubscriptionNotFoundException("test"),
-                BillingException("test"),
-                InvalidPlanException("test"),
-                ResourceNotFoundException("test")
-            )
+            val exceptions =
+                listOf(
+                    UserNotFoundException("test"),
+                    UserInactiveException("test"),
+                    SubscriptionNotFoundException("test"),
+                    BillingException("test"),
+                    InvalidPlanException("test"),
+                    ResourceNotFoundException("test"),
+                )
 
             exceptions.forEach { exception ->
                 exception shouldBeInstanceOf KoallaException::class
@@ -126,14 +126,14 @@ class KoallaExceptionsTest {
         fun `KoallaException should be catchable as parent type`() {
             val exception: KoallaException = UserNotFoundException("test")
 
-            val caught = try {
-                throw exception
-            } catch (e: KoallaException) {
-                e
-            }
+            val caught =
+                try {
+                    throw exception
+                } catch (e: KoallaException) {
+                    e
+                }
 
             caught shouldBeInstanceOf UserNotFoundException::class
         }
     }
 }
-

@@ -12,7 +12,6 @@ import java.util.concurrent.Executor
 @Configuration
 @EnableAsync
 class AsyncConfig {
-
     @Bean(name = ["taskExecutor"])
     fun taskExecutor(): Executor {
         val executor = ThreadPoolTaskExecutor()
@@ -30,8 +29,5 @@ class AsyncConfig {
      * Bound to the taskExecutor thread pool.
      */
     @Bean
-    fun applicationScope(taskExecutor: Executor): CoroutineScope {
-        return CoroutineScope(SupervisorJob() + taskExecutor.asCoroutineDispatcher())
-    }
+    fun applicationScope(taskExecutor: Executor): CoroutineScope = CoroutineScope(SupervisorJob() + taskExecutor.asCoroutineDispatcher())
 }
-

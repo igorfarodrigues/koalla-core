@@ -3,8 +3,6 @@ package ai.koalla.core.service
 import ai.koalla.core.config.KoallaProperties
 import ai.koalla.core.config.PlansProperties
 import ai.koalla.core.domain.User
-import ai.koalla.core.dto.CardData
-import ai.koalla.core.dto.CardHolderInfo
 import ai.koalla.core.entity.*
 import ai.koalla.core.exception.SubscriptionNotFoundException
 import ai.koalla.core.exception.UserNotFoundException
@@ -13,7 +11,6 @@ import ai.koalla.core.gateway.ChatwootGateway
 import ai.koalla.core.repository.*
 import io.mockk.*
 import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldNotBeNull
 import org.amshove.kluent.shouldThrow
 import org.amshove.kluent.withMessage
 import org.junit.jupiter.api.BeforeEach
@@ -24,7 +21,6 @@ import java.time.OffsetDateTime
 import java.util.*
 
 class BillingServiceTest {
-
     private lateinit var userRepository: UserRepository
     private lateinit var asaasCustomerRepository: AsaasCustomerRepository
     private lateinit var subscriptionRepository: SubscriptionRepository
@@ -44,26 +40,29 @@ class BillingServiceTest {
         webhookEventRepository = mockk()
         asaasGateway = mockk()
         chatwootGateway = mockk()
-        props = KoallaProperties(
-            trialDays = 15,
-            graceHours = 48,
-            plans = PlansProperties(
-                starter = BigDecimal("29.90"),
-                pro = BigDecimal("79.90"),
-                business = BigDecimal("99.90")
+        props =
+            KoallaProperties(
+                trialDays = 15,
+                graceHours = 48,
+                plans =
+                    PlansProperties(
+                        starter = BigDecimal("29.90"),
+                        pro = BigDecimal("79.90"),
+                        business = BigDecimal("99.90"),
+                    ),
             )
-        )
 
-        billingService = BillingService(
-            userRepository = userRepository,
-            asaasCustomerRepository = asaasCustomerRepository,
-            subscriptionRepository = subscriptionRepository,
-            invoiceRepository = invoiceRepository,
-            webhookEventRepository = webhookEventRepository,
-            asaasGateway = asaasGateway,
-            chatwootGateway = chatwootGateway,
-            props = props
-        )
+        billingService =
+            BillingService(
+                userRepository = userRepository,
+                asaasCustomerRepository = asaasCustomerRepository,
+                subscriptionRepository = subscriptionRepository,
+                invoiceRepository = invoiceRepository,
+                webhookEventRepository = webhookEventRepository,
+                asaasGateway = asaasGateway,
+                chatwootGateway = chatwootGateway,
+                props = props,
+            )
     }
 
     @Nested
@@ -88,12 +87,13 @@ class BillingServiceTest {
         fun `should create new invoice when payment not found`() {
             val userId = UUID.randomUUID()
             val subscriptionId = UUID.randomUUID()
-            val subscription = createSubscription(
-                id = subscriptionId,
-                userId = userId,
-                status = SubStatus.TRIALING,
-                planName = "STARTER"
-            )
+            val subscription =
+                createSubscription(
+                    id = subscriptionId,
+                    userId = userId,
+                    status = SubStatus.TRIALING,
+                    planName = "STARTER",
+                )
 
             every { subscriptionRepository.findByAsaasSubscriptionId("sub-123") } returns subscription
             every { invoiceRepository.findByAsaasPaymentId("payment-123") } returns null
@@ -104,11 +104,13 @@ class BillingServiceTest {
             billingService.handlePaymentConfirmed("payment-123", "sub-123")
 
             verify {
-                invoiceRepository.save(match {
-                    it.asaasPaymentId == "payment-123" &&
-                    it.status == "CONFIRMED" &&
-                    it.amount == BigDecimal("29.90")
-                })
+                invoiceRepository.save(
+                    match {
+                        it.asaasPaymentId == "payment-123" &&
+                            it.status == "CONFIRMED" &&
+                            it.amount == BigDecimal("29.90")
+                    },
+                )
             }
         }
 
@@ -116,19 +118,21 @@ class BillingServiceTest {
         fun `should update existing invoice status`() {
             val userId = UUID.randomUUID()
             val subscriptionId = UUID.randomUUID()
-            val subscription = createSubscription(
-                id = subscriptionId,
-                userId = userId,
-                status = SubStatus.PAST_DUE,
-                planName = "STARTER"
-            )
-            val existingInvoice = Invoice(
-                userId = userId,
-                subscriptionId = subscriptionId,
-                asaasPaymentId = "payment-123",
-                amount = BigDecimal("29.90"),
-                status = "PENDING"
-            )
+            val subscription =
+                createSubscription(
+                    id = subscriptionId,
+                    userId = userId,
+                    status = SubStatus.PAST_DUE,
+                    planName = "STARTER",
+                )
+            val existingInvoice =
+                Invoice(
+                    userId = userId,
+                    subscriptionId = subscriptionId,
+                    asaasPaymentId = "payment-123",
+                    amount = BigDecimal("29.90"),
+                    status = "PENDING",
+                )
 
             every { subscriptionRepository.findByAsaasSubscriptionId("sub-123") } returns subscription
             every { invoiceRepository.findByAsaasPaymentId("payment-123") } returns existingInvoice
@@ -145,13 +149,14 @@ class BillingServiceTest {
         fun `should update subscription status to ACTIVE and clear grace period`() {
             val userId = UUID.randomUUID()
             val subscriptionId = UUID.randomUUID()
-            val subscription = createSubscription(
-                id = subscriptionId,
-                userId = userId,
-                status = SubStatus.PAST_DUE,
-                planName = "STARTER",
-                graceExpiresAt = OffsetDateTime.now().plusHours(24)
-            )
+            val subscription =
+                createSubscription(
+                    id = subscriptionId,
+                    userId = userId,
+                    status = SubStatus.PAST_DUE,
+                    planName = "STARTER",
+                    graceExpiresAt = OffsetDateTime.now().plusHours(24),
+                )
 
             every { subscriptionRepository.findByAsaasSubscriptionId("sub-123") } returns subscription
             every { invoiceRepository.findByAsaasPaymentId("payment-123") } returns null
@@ -162,10 +167,12 @@ class BillingServiceTest {
             billingService.handlePaymentConfirmed("payment-123", "sub-123")
 
             verify {
-                subscriptionRepository.save(match {
-                    it.status == SubStatus.ACTIVE &&
-                    it.graceExpiresAt == null
-                })
+                subscriptionRepository.save(
+                    match {
+                        it.status == SubStatus.ACTIVE &&
+                            it.graceExpiresAt == null
+                    },
+                )
             }
         }
 
@@ -173,12 +180,13 @@ class BillingServiceTest {
         fun `should activate inactive user`() {
             val userId = UUID.randomUUID()
             val subscriptionId = UUID.randomUUID()
-            val subscription = createSubscription(
-                id = subscriptionId,
-                userId = userId,
-                status = SubStatus.PAST_DUE,
-                planName = "STARTER"
-            )
+            val subscription =
+                createSubscription(
+                    id = subscriptionId,
+                    userId = userId,
+                    status = SubStatus.PAST_DUE,
+                    planName = "STARTER",
+                )
             val userEntity = createUserEntity(id = userId, isActive = false)
 
             every { subscriptionRepository.findByAsaasSubscriptionId("sub-123") } returns subscription
@@ -197,12 +205,13 @@ class BillingServiceTest {
         fun `should not save user if already active`() {
             val userId = UUID.randomUUID()
             val subscriptionId = UUID.randomUUID()
-            val subscription = createSubscription(
-                id = subscriptionId,
-                userId = userId,
-                status = SubStatus.TRIALING,
-                planName = "STARTER"
-            )
+            val subscription =
+                createSubscription(
+                    id = subscriptionId,
+                    userId = userId,
+                    status = SubStatus.TRIALING,
+                    planName = "STARTER",
+                )
             val userEntity = createUserEntity(id = userId, isActive = true)
 
             every { subscriptionRepository.findByAsaasSubscriptionId("sub-123") } returns subscription
@@ -239,12 +248,13 @@ class BillingServiceTest {
         fun `should set grace period when status changes to PAST_DUE`() {
             val userId = UUID.randomUUID()
             val subscriptionId = UUID.randomUUID()
-            val subscription = createSubscription(
-                id = subscriptionId,
-                userId = userId,
-                status = SubStatus.ACTIVE,
-                planName = "STARTER"
-            )
+            val subscription =
+                createSubscription(
+                    id = subscriptionId,
+                    userId = userId,
+                    status = SubStatus.ACTIVE,
+                    planName = "STARTER",
+                )
             val userEntity = createUserEntity(id = userId, waId = "5511999999999")
 
             every { subscriptionRepository.findByAsaasSubscriptionId("sub-123") } returns subscription
@@ -257,10 +267,12 @@ class BillingServiceTest {
             billingService.handlePaymentOverdue("payment-123", "sub-123")
 
             verify {
-                subscriptionRepository.save(match {
-                    it.status == SubStatus.PAST_DUE &&
-                    it.graceExpiresAt != null
-                })
+                subscriptionRepository.save(
+                    match {
+                        it.status == SubStatus.PAST_DUE &&
+                            it.graceExpiresAt != null
+                    },
+                )
             }
         }
 
@@ -269,13 +281,14 @@ class BillingServiceTest {
             val userId = UUID.randomUUID()
             val subscriptionId = UUID.randomUUID()
             val existingGraceExpiry = OffsetDateTime.now().plusHours(24)
-            val subscription = createSubscription(
-                id = subscriptionId,
-                userId = userId,
-                status = SubStatus.PAST_DUE,
-                planName = "STARTER",
-                graceExpiresAt = existingGraceExpiry
-            )
+            val subscription =
+                createSubscription(
+                    id = subscriptionId,
+                    userId = userId,
+                    status = SubStatus.PAST_DUE,
+                    planName = "STARTER",
+                    graceExpiresAt = existingGraceExpiry,
+                )
 
             every { subscriptionRepository.findByAsaasSubscriptionId("sub-123") } returns subscription
             every { invoiceRepository.findByAsaasPaymentId("payment-123") } returns null
@@ -290,12 +303,13 @@ class BillingServiceTest {
         fun `should create overdue invoice`() {
             val userId = UUID.randomUUID()
             val subscriptionId = UUID.randomUUID()
-            val subscription = createSubscription(
-                id = subscriptionId,
-                userId = userId,
-                status = SubStatus.PAST_DUE,
-                planName = "PRO"
-            )
+            val subscription =
+                createSubscription(
+                    id = subscriptionId,
+                    userId = userId,
+                    status = SubStatus.PAST_DUE,
+                    planName = "PRO",
+                )
 
             every { subscriptionRepository.findByAsaasSubscriptionId("sub-123") } returns subscription
             every { invoiceRepository.findByAsaasPaymentId("payment-123") } returns null
@@ -304,10 +318,12 @@ class BillingServiceTest {
             billingService.handlePaymentOverdue("payment-123", "sub-123")
 
             verify {
-                invoiceRepository.save(match {
-                    it.status == "OVERDUE" &&
-                    it.amount == BigDecimal("79.90")
-                })
+                invoiceRepository.save(
+                    match {
+                        it.status == "OVERDUE" &&
+                            it.amount == BigDecimal("79.90")
+                    },
+                )
             }
         }
     }
@@ -327,12 +343,13 @@ class BillingServiceTest {
         fun `should cancel subscription and deactivate user`() {
             val userId = UUID.randomUUID()
             val subscriptionId = UUID.randomUUID()
-            val subscription = createSubscription(
-                id = subscriptionId,
-                userId = userId,
-                status = SubStatus.ACTIVE,
-                planName = "STARTER"
-            )
+            val subscription =
+                createSubscription(
+                    id = subscriptionId,
+                    userId = userId,
+                    status = SubStatus.ACTIVE,
+                    planName = "STARTER",
+                )
             val userEntity = createUserEntity(id = userId, waId = "5511999999999", isActive = true)
 
             every { subscriptionRepository.findByAsaasSubscriptionId("sub-123") } returns subscription
@@ -351,12 +368,13 @@ class BillingServiceTest {
         fun `should not deactivate already inactive user`() {
             val userId = UUID.randomUUID()
             val subscriptionId = UUID.randomUUID()
-            val subscription = createSubscription(
-                id = subscriptionId,
-                userId = userId,
-                status = SubStatus.ACTIVE,
-                planName = "STARTER"
-            )
+            val subscription =
+                createSubscription(
+                    id = subscriptionId,
+                    userId = userId,
+                    status = SubStatus.ACTIVE,
+                    planName = "STARTER",
+                )
             val userEntity = createUserEntity(id = userId, isActive = false)
 
             every { subscriptionRepository.findByAsaasSubscriptionId("sub-123") } returns subscription
@@ -387,11 +405,12 @@ class BillingServiceTest {
         fun `should throw when user not found`() {
             val userId = UUID.randomUUID()
             val user = createUser(id = userId, waId = "5511999999999")
-            val subscription = createSubscription(
-                userId = userId,
-                status = SubStatus.ACTIVE,
-                asaasSubscriptionId = "asaas-sub-123"
-            )
+            val subscription =
+                createSubscription(
+                    userId = userId,
+                    status = SubStatus.ACTIVE,
+                    asaasSubscriptionId = "asaas-sub-123",
+                )
 
             every { subscriptionRepository.findActiveByUserId(userId) } returns subscription
             coEvery { asaasGateway.cancelSubscription("asaas-sub-123") } returns emptyMap()
@@ -406,11 +425,12 @@ class BillingServiceTest {
         fun `should cancel subscription and deactivate user`() {
             val userId = UUID.randomUUID()
             val user = createUser(id = userId, waId = "5511999999999")
-            val subscription = createSubscription(
-                userId = userId,
-                status = SubStatus.ACTIVE,
-                asaasSubscriptionId = "asaas-sub-123"
-            )
+            val subscription =
+                createSubscription(
+                    userId = userId,
+                    status = SubStatus.ACTIVE,
+                    asaasSubscriptionId = "asaas-sub-123",
+                )
             val userEntity = createUserEntity(id = userId, isActive = true)
 
             every { subscriptionRepository.findActiveByUserId(userId) } returns subscription
@@ -443,16 +463,18 @@ class BillingServiceTest {
         fun `should deactivate users with expired grace periods`() {
             val userId1 = UUID.randomUUID()
             val userId2 = UUID.randomUUID()
-            val subscription1 = createSubscription(
-                userId = userId1,
-                status = SubStatus.PAST_DUE,
-                graceExpiresAt = OffsetDateTime.now().minusHours(1)
-            )
-            val subscription2 = createSubscription(
-                userId = userId2,
-                status = SubStatus.PAST_DUE,
-                graceExpiresAt = OffsetDateTime.now().minusHours(2)
-            )
+            val subscription1 =
+                createSubscription(
+                    userId = userId1,
+                    status = SubStatus.PAST_DUE,
+                    graceExpiresAt = OffsetDateTime.now().minusHours(1),
+                )
+            val subscription2 =
+                createSubscription(
+                    userId = userId2,
+                    status = SubStatus.PAST_DUE,
+                    graceExpiresAt = OffsetDateTime.now().minusHours(2),
+                )
             val userEntity1 = createUserEntity(id = userId1, waId = "5511111111111", isActive = true)
             val userEntity2 = createUserEntity(id = userId2, waId = "5522222222222", isActive = true)
 
@@ -473,11 +495,12 @@ class BillingServiceTest {
         @Test
         fun `should not count already inactive users`() {
             val userId = UUID.randomUUID()
-            val subscription = createSubscription(
-                userId = userId,
-                status = SubStatus.PAST_DUE,
-                graceExpiresAt = OffsetDateTime.now().minusHours(1)
-            )
+            val subscription =
+                createSubscription(
+                    userId = userId,
+                    status = SubStatus.PAST_DUE,
+                    graceExpiresAt = OffsetDateTime.now().minusHours(1),
+                )
             val userEntity = createUserEntity(id = userId, isActive = false)
 
             every { subscriptionRepository.findExpiredGracePeriods(any()) } returns listOf(subscription)
@@ -518,10 +541,12 @@ class BillingServiceTest {
             billingService.markEventProcessed("event-123", "PAYMENT_CONFIRMED")
 
             verify {
-                webhookEventRepository.save(match {
-                    it.eventId == "event-123" &&
-                    it.eventType == "PAYMENT_CONFIRMED"
-                })
+                webhookEventRepository.save(
+                    match {
+                        it.eventId == "event-123" &&
+                            it.eventType == "PAYMENT_CONFIRMED"
+                    },
+                )
             }
         }
     }
@@ -533,14 +558,14 @@ class BillingServiceTest {
         asaasSubscriptionId: String? = "sub-${UUID.randomUUID()}",
         status: SubStatus = SubStatus.ACTIVE,
         planName: String? = "STARTER",
-        graceExpiresAt: OffsetDateTime? = null
+        graceExpiresAt: OffsetDateTime? = null,
     ) = Subscription(
         id = id,
         userId = userId,
         asaasSubscriptionId = asaasSubscriptionId,
         status = status,
         planName = planName,
-        graceExpiresAt = graceExpiresAt
+        graceExpiresAt = graceExpiresAt,
     )
 
     private fun createUser(
@@ -552,18 +577,19 @@ class BillingServiceTest {
         lifetime: Boolean = false,
         isActive: Boolean = true,
         createdAt: OffsetDateTime = OffsetDateTime.now(),
-        updatedAt: OffsetDateTime = OffsetDateTime.now()
-    ): User = User(
-        id = id,
-        waId = waId,
-        fullName = fullName,
-        email = email,
-        planType = planType,
-        lifetime = lifetime,
-        isActive = isActive,
-        createdAt = createdAt,
-        updatedAt = updatedAt
-    )
+        updatedAt: OffsetDateTime = OffsetDateTime.now(),
+    ): User =
+        User(
+            id = id,
+            waId = waId,
+            fullName = fullName,
+            email = email,
+            planType = planType,
+            lifetime = lifetime,
+            isActive = isActive,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+        )
 
     private fun createUserEntity(
         id: UUID? = UUID.randomUUID(),
@@ -571,13 +597,13 @@ class BillingServiceTest {
         fullName: String? = "Test User",
         email: String? = "test@example.com",
         planType: String = "FREE",
-        isActive: Boolean = true
-    ): UserEntity = UserEntity(
-        waId = waId,
-        fullName = fullName,
-        email = email,
-        planType = planType,
-        isActive = isActive
-    ).apply { this.id = id }
+        isActive: Boolean = true,
+    ): UserEntity =
+        UserEntity(
+            waId = waId,
+            fullName = fullName,
+            email = email,
+            planType = planType,
+            isActive = isActive,
+        ).apply { this.id = id }
 }
-

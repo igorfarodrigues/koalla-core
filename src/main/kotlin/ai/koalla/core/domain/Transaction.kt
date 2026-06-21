@@ -19,5 +19,5 @@ data class Transaction(
     val externalId: String?,
     val occurredAt: OffsetDateTime?,
     val createdAt: OffsetDateTime,
-    val updatedAt: OffsetDateTime
+    val updatedAt: OffsetDateTime,
 )

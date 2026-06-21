@@ -9,6 +9,7 @@ import java.util.UUID
 @Repository
 interface UserRepository : JpaRepository<UserEntity, UUID> {
     fun findByWaId(waId: String): UserEntity?
+
     fun findByEmail(email: String): UserEntity?
 }
 
@@ -16,4 +17,3 @@ interface UserRepository : JpaRepository<UserEntity, UUID> {
 interface AuthRepository : JpaRepository<AuthEntity, UUID> {
     fun findByUserId(userId: UUID): AuthEntity?
 }
-

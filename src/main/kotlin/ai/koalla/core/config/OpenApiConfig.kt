@@ -22,38 +22,41 @@ import org.springframework.context.annotation.Configuration
  */
 @Configuration
 class OpenApiConfig(
-    @Value("\${koalla.version:0.3.0}") private val version: String
+    @Value("\${koalla.version:0.3.0}") private val version: String,
 ) {
-
     @Bean
-    fun customOpenAPI(): OpenAPI {
-        return OpenAPI()
+    fun customOpenAPI(): OpenAPI =
+        OpenAPI()
             .info(apiInfo())
-            .servers(listOf(
-                Server().url("/").description("Current Server"),
-                Server().url("http://localhost:8080").description("Local Development"),
-                Server().url("https://api.koalla.ai").description("Production")
-            ))
-            .components(Components()
-                .addSecuritySchemes("basicAuth", SecurityScheme()
-                    .type(SecurityScheme.Type.HTTP)
-                    .scheme("basic")
-                    .description("Basic authentication for admin endpoints")
-                )
-                .addSecuritySchemes("bearerAuth", SecurityScheme()
-                    .type(SecurityScheme.Type.HTTP)
-                    .scheme("bearer")
-                    .bearerFormat("JWT")
-                    .description("JWT token authentication")
-                )
-            )
-            .addSecurityItem(SecurityRequirement().addList("basicAuth"))
-    }
+            .servers(
+                listOf(
+                    Server().url("/").description("Current Server"),
+                    Server().url("http://localhost:8080").description("Local Development"),
+                    Server().url("https://api.koalla.ai").description("Production"),
+                ),
+            ).components(
+                Components()
+                    .addSecuritySchemes(
+                        "basicAuth",
+                        SecurityScheme()
+                            .type(SecurityScheme.Type.HTTP)
+                            .scheme("basic")
+                            .description("Basic authentication for admin endpoints"),
+                    ).addSecuritySchemes(
+                        "bearerAuth",
+                        SecurityScheme()
+                            .type(SecurityScheme.Type.HTTP)
+                            .scheme("bearer")
+                            .bearerFormat("JWT")
+                            .description("JWT token authentication"),
+                    ),
+            ).addSecurityItem(SecurityRequirement().addList("basicAuth"))
 
-    private fun apiInfo(): Info {
-        return Info()
+    private fun apiInfo(): Info =
+        Info()
             .title("Koalla API")
-            .description("""
+            .description(
+                """
                 API backend do Koalla, assistente financeira pessoal via WhatsApp.
                 
                 ## Funcionalidades
@@ -70,17 +73,16 @@ class OpenApiConfig(
                 1. Chatwoot envia webhook para `/webhook/chatwoot`
                 2. Pipeline processa mensagem (debounce, lock, agent)
                 3. Resposta é enviada de volta ao Chatwoot
-            """.trimIndent())
-            .version(version)
-            .contact(Contact()
-                .name("Koalla Team")
-                .email("dev@koalla.ai")
-                .url("https://koalla.ai")
+                """.trimIndent(),
+            ).version(version)
+            .contact(
+                Contact()
+                    .name("Koalla Team")
+                    .email("dev@koalla.ai")
+                    .url("https://koalla.ai"),
+            ).license(
+                License()
+                    .name("Proprietary")
+                    .url("https://koalla.ai/terms"),
             )
-            .license(License()
-                .name("Proprietary")
-                .url("https://koalla.ai/terms")
-            )
-    }
 }
-

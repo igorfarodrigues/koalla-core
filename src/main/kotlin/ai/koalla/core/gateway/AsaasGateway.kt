@@ -9,12 +9,11 @@ import java.math.BigDecimal
  * Decouples BillingService from the concrete WebClient implementation.
  */
 interface AsaasGateway {
-
     suspend fun getOrCreateCustomer(
         name: String,
         phone: String,
         email: String? = null,
-        cpf: String? = null
+        cpf: String? = null,
     ): Map<String, Any>
 
     suspend fun createSubscription(
@@ -22,7 +21,7 @@ interface AsaasGateway {
         plan: String,
         cardData: CardData,
         cardHolderInfo: CardHolderInfo,
-        trialDays: Int? = null
+        trialDays: Int? = null,
     ): Map<String, Any>
 
     suspend fun getSubscription(subscriptionId: String): Map<String, Any>
@@ -35,7 +34,7 @@ interface AsaasGateway {
         customerId: String,
         value: BigDecimal,
         dueDate: String,
-        existingChargeId: String? = null
+        existingChargeId: String? = null,
     ): Map<String, Any>
 
     suspend fun getPixQrCode(paymentId: String): Map<String, Any>

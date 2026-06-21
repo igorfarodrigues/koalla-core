@@ -9,17 +9,16 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @Tag(name = "Health", description = "Endpoints de monitoramento e status")
 class HealthController(
-    private val props: KoallaProperties
+    private val props: KoallaProperties,
 ) {
     @GetMapping("/health")
     @Operation(
         summary = "Health check",
-        description = "Retorna o status da aplicação e versão atual"
+        description = "Retorna o status da aplicação e versão atual",
     )
-    fun health(): Map<String, String> {
-        return mapOf(
+    fun health(): Map<String, String> =
+        mapOf(
             "status" to "ok",
-            "version" to props.version
+            "version" to props.version,
         )
-    }
 }

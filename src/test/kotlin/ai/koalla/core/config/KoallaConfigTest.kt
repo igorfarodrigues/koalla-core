@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 
 class KoallaConfigTest {
-
     @Nested
     inner class PlansPropertiesTests {
         @Test
@@ -53,11 +52,12 @@ class KoallaConfigTest {
 
         @Test
         fun `should use custom values when provided`() {
-            val plans = PlansProperties(
-                starter = BigDecimal("19.90"),
-                pro = BigDecimal("49.90"),
-                business = BigDecimal("149.90")
-            )
+            val plans =
+                PlansProperties(
+                    starter = BigDecimal("19.90"),
+                    pro = BigDecimal("49.90"),
+                    business = BigDecimal("149.90"),
+                )
 
             plans.getValue("STARTER") shouldBeEqualTo BigDecimal("19.90")
             plans.getValue("PRO") shouldBeEqualTo BigDecimal("49.90")
@@ -84,12 +84,13 @@ class KoallaConfigTest {
 
         @Test
         fun `should allow custom values`() {
-            val props = KoallaProperties(
-                version = "1.0.0",
-                trialDays = 30,
-                graceHours = 72,
-                agentMaxIterations = 20
-            )
+            val props =
+                KoallaProperties(
+                    version = "1.0.0",
+                    trialDays = 30,
+                    graceHours = 72,
+                    agentMaxIterations = 20,
+                )
 
             props.version shouldBeEqualTo "1.0.0"
             props.trialDays shouldBeEqualTo 30
@@ -112,12 +113,13 @@ class KoallaConfigTest {
 
         @Test
         fun `should allow custom values`() {
-            val props = ChatwootProperties(
-                url = "https://custom.chatwoot.com",
-                apiToken = "token-123",
-                accountId = 5,
-                webhookSecret = "secret-456"
-            )
+            val props =
+                ChatwootProperties(
+                    url = "https://custom.chatwoot.com",
+                    apiToken = "token-123",
+                    accountId = 5,
+                    webhookSecret = "secret-456",
+                )
 
             props.url shouldBeEqualTo "https://custom.chatwoot.com"
             props.apiToken shouldBeEqualTo "token-123"
@@ -139,11 +141,12 @@ class KoallaConfigTest {
 
         @Test
         fun `should allow custom values`() {
-            val props = AsaasProperties(
-                url = "https://api.asaas.com",
-                apiKey = "api-key-123",
-                webhookToken = "webhook-token-456"
-            )
+            val props =
+                AsaasProperties(
+                    url = "https://api.asaas.com",
+                    apiKey = "api-key-123",
+                    webhookToken = "webhook-token-456",
+                )
 
             props.url shouldBeEqualTo "https://api.asaas.com"
             props.apiKey shouldBeEqualTo "api-key-123"
@@ -151,4 +154,3 @@ class KoallaConfigTest {
         }
     }
 }
-

@@ -18,7 +18,6 @@ import java.util.Optional
 import java.util.UUID
 
 class UserServiceTest {
-
     private lateinit var userRepository: UserRepository
     private lateinit var userService: UserService
 
@@ -132,13 +131,14 @@ class UserServiceTest {
             }
 
             // When
-            val result = userService.createUser(
-                waId = "5511999999999",
-                fullName = "Test User",
-                email = "test@example.com",
-                planType = "PRO",
-                isActive = true
-            )
+            val result =
+                userService.createUser(
+                    waId = "5511999999999",
+                    fullName = "Test User",
+                    email = "test@example.com",
+                    planType = "PRO",
+                    isActive = true,
+                )
 
             // Then
             result.shouldNotBeNull()
@@ -303,13 +303,13 @@ class UserServiceTest {
         fullName: String? = "Test User",
         email: String? = "test@example.com",
         planType: String = "FREE",
-        isActive: Boolean = true
-    ): UserEntity = UserEntity(
-        waId = waId,
-        fullName = fullName,
-        email = email,
-        planType = planType,
-        isActive = isActive
-    ).apply { this.id = id }
+        isActive: Boolean = true,
+    ): UserEntity =
+        UserEntity(
+            waId = waId,
+            fullName = fullName,
+            email = email,
+            planType = planType,
+            isActive = isActive,
+        ).apply { this.id = id }
 }
-

@@ -15,7 +15,6 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 class BillingMapperTest {
-
     @Test
     fun `Subscription toDomain should map all fields correctly`() {
         // Given
@@ -25,17 +24,18 @@ class BillingMapperTest {
         val nextDue = LocalDate.now().plusDays(30)
         val graceExpires = now.plusHours(48)
 
-        val entity = Subscription(
-            userId = userId,
-            asaasSubscriptionId = "sub_123",
-            status = SubStatus.ACTIVE,
-            planName = "PRO",
-            nextDueDate = nextDue,
-            graceExpiresAt = graceExpires
-        ).apply {
-            this.id = id
-            this.createdAt = now
-        }
+        val entity =
+            Subscription(
+                userId = userId,
+                asaasSubscriptionId = "sub_123",
+                status = SubStatus.ACTIVE,
+                planName = "PRO",
+                nextDueDate = nextDue,
+                graceExpiresAt = graceExpires,
+            ).apply {
+                this.id = id
+                this.createdAt = now
+            }
 
         // When
         val domain = entity.toDomain()
@@ -59,18 +59,19 @@ class BillingMapperTest {
         val userId = UUID.randomUUID()
         val subscriptionId = UUID.randomUUID()
 
-        val entity = Invoice(
-            userId = userId,
-            subscriptionId = subscriptionId,
-            asaasPaymentId = "pay_456",
-            amount = BigDecimal("49.90"),
-            status = "CONFIRMED",
-            pixCode = "pix-code-123",
-            paymentLink = "https://pay.asaas.com/123"
-        ).apply {
-            this.id = id
-            this.createdAt = now
-        }
+        val entity =
+            Invoice(
+                userId = userId,
+                subscriptionId = subscriptionId,
+                asaasPaymentId = "pay_456",
+                amount = BigDecimal("49.90"),
+                status = "CONFIRMED",
+                pixCode = "pix-code-123",
+                paymentLink = "https://pay.asaas.com/123",
+            ).apply {
+                this.id = id
+                this.createdAt = now
+            }
 
         // When
         val domain = entity.toDomain()
@@ -93,12 +94,13 @@ class BillingMapperTest {
         val now = OffsetDateTime.now()
         val userId = UUID.randomUUID()
 
-        val entity = AsaasCustomer(
-            userId = userId,
-            asaasCustomerId = "cus_789"
-        ).apply {
-            this.createdAt = now
-        }
+        val entity =
+            AsaasCustomer(
+                userId = userId,
+                asaasCustomerId = "cus_789",
+            ).apply {
+                this.createdAt = now
+            }
 
         // When
         val domain = entity.toDomain()
@@ -167,4 +169,3 @@ class BillingMapperTest {
         backToEntity shouldBeEqualTo originalStatus
     }
 }
-

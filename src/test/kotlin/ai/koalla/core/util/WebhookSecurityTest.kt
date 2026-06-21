@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class WebhookSecurityTest {
-
     @Nested
     inner class SecureCompareTests {
         @Test
@@ -73,4 +72,3 @@ class WebhookSecurityTest {
         }
     }
 }
-

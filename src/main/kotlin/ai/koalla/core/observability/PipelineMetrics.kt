@@ -17,17 +17,21 @@ import org.springframework.stereotype.Component
  *   koalla.agent.duration      — end-to-end agent + tool execution time
  */
 @Component
-class PipelineMetrics(private val registry: MeterRegistry) {
-
+class PipelineMetrics(
+    private val registry: MeterRegistry,
+) {
     // Micrometer's register() is idempotent — no need for a ConcurrentHashMap cache
-    val agentTimer: Timer = Timer.builder("koalla.agent.duration")
-        .description("End-to-end agent + tool execution duration")
-        .register(registry)
+    val agentTimer: Timer =
+        Timer
+            .builder("koalla.agent.duration")
+            .description("End-to-end agent + tool execution duration")
+            .register(registry)
 
     // ── Counters ──────────────────────────────────────────────────────────────
 
     fun messageProcessed(type: String = "text") {
-        Counter.builder("koalla.messages.processed")
+        Counter
+            .builder("koalla.messages.processed")
             .description("Messages delivered to the AI agent")
             .tag("type", type)
             .register(registry)
@@ -35,7 +39,8 @@ class PipelineMetrics(private val registry: MeterRegistry) {
     }
 
     fun messageBlocked(reason: String) {
-        Counter.builder("koalla.messages.blocked")
+        Counter
+            .builder("koalla.messages.blocked")
             .description("Messages skipped before reaching the agent")
             .tag("reason", reason)
             .register(registry)
@@ -43,7 +48,8 @@ class PipelineMetrics(private val registry: MeterRegistry) {
     }
 
     fun pipelineError() {
-        Counter.builder("koalla.pipeline.errors")
+        Counter
+            .builder("koalla.pipeline.errors")
             .description("Unhandled exceptions in the message pipeline")
             .register(registry)
             .increment()

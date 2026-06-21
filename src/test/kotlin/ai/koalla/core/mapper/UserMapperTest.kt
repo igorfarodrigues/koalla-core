@@ -8,24 +8,24 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 class UserMapperTest {
-
     @Test
     fun `toDomain should map UserEntity to User correctly`() {
         // Given
         val now = OffsetDateTime.now()
         val id = UUID.randomUUID()
-        val entity = UserEntity(
-            waId = "5511999999999",
-            fullName = "Test User",
-            email = "test@example.com",
-            planType = "STARTER",
-            lifetime = false,
-            isActive = true
-        ).apply {
-            this.id = id
-            this.createdAt = now
-            this.updateAt = now
-        }
+        val entity =
+            UserEntity(
+                waId = "5511999999999",
+                fullName = "Test User",
+                email = "test@example.com",
+                planType = "STARTER",
+                lifetime = false,
+                isActive = true,
+            ).apply {
+                this.id = id
+                this.createdAt = now
+                this.updateAt = now
+            }
 
         // When
         val domain = entity.toDomain()
@@ -46,9 +46,10 @@ class UserMapperTest {
     fun `toDomain should handle null optional fields`() {
         // Given
         val id = UUID.randomUUID()
-        val entity = UserEntity(waId = "5511888888888").apply {
-            this.id = id
-        }
+        val entity =
+            UserEntity(waId = "5511888888888").apply {
+                this.id = id
+            }
 
         // When
         val domain = entity.toDomain()
@@ -64,17 +65,18 @@ class UserMapperTest {
     fun `toResponse should map User to UserResponse correctly`() {
         // Given
         val now = OffsetDateTime.now()
-        val user = User(
-            id = UUID.randomUUID(),
-            waId = "5511999999999",
-            fullName = "Test User",
-            email = "test@example.com",
-            planType = "PRO",
-            lifetime = true,
-            isActive = true,
-            createdAt = now,
-            updatedAt = now
-        )
+        val user =
+            User(
+                id = UUID.randomUUID(),
+                waId = "5511999999999",
+                fullName = "Test User",
+                email = "test@example.com",
+                planType = "PRO",
+                lifetime = true,
+                isActive = true,
+                createdAt = now,
+                updatedAt = now,
+            )
 
         // When
         val response = user.toResponse()
@@ -91,4 +93,3 @@ class UserMapperTest {
         response.updateAt shouldBeEqualTo now
     }
 }
-
