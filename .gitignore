@@ -50,6 +50,7 @@ build/
 # Kotlin
 *.class
 out/
+.kotlin
 
 # Spring Boot
 HELP.md

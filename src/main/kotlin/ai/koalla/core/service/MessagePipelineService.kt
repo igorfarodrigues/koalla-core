@@ -73,6 +73,7 @@ class MessagePipelineService(
             if (!att.isNullOrEmpty()) {
                 @Suppress("UNCHECKED_CAST")
                 val firstAtt = att.first() as? Map<String, Any>
+                @Suppress("UNCHECKED_CAST")
                 val meta = firstAtt?.get("meta") as? Map<String, Any>
                 isAudio = meta?.get("is_recorded_audio") as? Boolean ?: false
             }
@@ -87,7 +88,7 @@ class MessagePipelineService(
         }
 
         // ── 3. Route: /teste ──────────────────────────────────────────────────
-        if (content.lowercase().trim() == "/teste" && accountId != null && conversationId != null) {
+        if (content.lowercase().trim() == "/teste" && conversationId != null) {
             val newLabels = (labels + "testando-agente").toList()
             chatwootClient.updateLabels(accountId, conversationId, newLabels)
             chatwootClient.sendMessage(accountId, conversationId, "Modo de teste habilitado.")
@@ -102,7 +103,7 @@ class MessagePipelineService(
         val user = userRepository.findByWaId(waId)
 
         if (user == null) {
-            if (accountId != null && conversationId != null) {
+            if (conversationId != null) {
                 chatwootClient.sendMessage(
                     accountId,
                     conversationId,
@@ -114,7 +115,7 @@ class MessagePipelineService(
         }
 
         if (!user.isActive) {
-            if (accountId != null && conversationId != null) {
+            if (conversationId != null) {
                 chatwootClient.sendMessage(
                     accountId,
                     conversationId,
@@ -180,12 +181,12 @@ class MessagePipelineService(
         val combinedMessage = queue.joinToString("\n") { it.message }
 
         // ── 11. Mark as read ──────────────────────────────────────────────────
-        if (accountId != null && conversationId != null) {
+        if (conversationId != null) {
             chatwootClient.markAsRead(accountId, conversationId)
         }
 
         // ── 12. Build agent context ───────────────────────────────────────────
-        val contactData = if (accountId != null && contactId != null) {
+        val contactData = if (contactId != null) {
             try {
                 chatwootClient.getContact(accountId, contactId)
             } catch (e: Exception) {
@@ -200,7 +201,7 @@ class MessagePipelineService(
         val agentContext = AgentContext(
             userId = user.id!!,
             waId = waId,
-            accountId = accountId ?: props.chatwoot.accountId,
+            accountId = accountId,
             conversationId = conversationId ?: 0,
             contactId = contactId ?: 0,
             messageId = messageId.toIntOrNull() ?: 0,
@@ -227,7 +228,7 @@ class MessagePipelineService(
         val formatted = koallaAgent.formatForWhatsApp(output)
 
         // ── 15. Send response ─────────────────────────────────────────────────
-        if (accountId != null && conversationId != null) {
+        if (conversationId != null) {
             val chunks = splitMessage(formatted)
             for (chunk in chunks) {
                 chatwootClient.sendMessage(accountId, conversationId, chunk)
