@@ -16,7 +16,7 @@ enum class EntityContext {
 
 @Entity
 @Table(name = "categories", schema = "koalla")
-class Category(
+class CategoryEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Int? = null,
@@ -30,7 +30,7 @@ class Category(
 
 @Entity
 @Table(name = "category_keywords", schema = "koalla")
-class CategoryKeyword(
+class CategoryKeywordEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Int? = null,
@@ -44,7 +44,7 @@ class CategoryKeyword(
 
 @Entity
 @Table(name = "transactions", schema = "koalla")
-class Transaction(
+class TransactionEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     var id: UUID? = null,
@@ -56,7 +56,7 @@ class Transaction(
     var description: String? = null,
 
     @Column(nullable = false)
-    var amount: Long, // stored in cents
+    var amount: Long,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -89,4 +89,3 @@ class Transaction(
         updatedAt = OffsetDateTime.now()
     }
 }
-

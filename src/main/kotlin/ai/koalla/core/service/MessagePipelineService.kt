@@ -1,16 +1,19 @@
 package ai.koalla.core.service
 
 import ai.koalla.core.agent.KoallaAgent
-import ai.koalla.core.client.ChatwootClient
 import ai.koalla.core.config.KoallaProperties
+import ai.koalla.core.domain.AgentContext
 import ai.koalla.core.dto.ChatwootWebhookBody
 import ai.koalla.core.entity.ConversationStatus
 import ai.koalla.core.entity.MessageQueue
+import ai.koalla.core.gateway.ChatwootGateway
+import ai.koalla.core.observability.PipelineMetrics
 import ai.koalla.core.repository.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.OffsetDateTime
@@ -26,30 +29,30 @@ class MessagePipelineService(
     private val messageQueueRepository: MessageQueueRepository,
     private val conversationStatusRepository: ConversationStatusRepository,
     private val chatHistoryRepository: ChatHistoryRepository,
-    private val chatwootClient: ChatwootClient,
+    private val chatwootGateway: ChatwootGateway,
     private val koallaAgent: KoallaAgent,
     private val audioService: AudioService,
     private val props: KoallaProperties,
-    private val applicationScope: CoroutineScope
+    private val applicationScope: CoroutineScope,
+    private val metrics: PipelineMetrics
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     companion object {
-        // Labels that prevent the bot from responding
         val BLOCKED_LABELS = setOf("agente-off", "gestor", "testando-agente")
     }
 
     /**
      * Entry point called by the webhook controller.
-     * Launches processing in the application CoroutineScope so the HTTP
-     * response returns immediately (non-blocking) while the pipeline runs
-     * in the background. SupervisorJob ensures one failure doesn't cancel others.
+     * Launches processing in the application CoroutineScope so the HTTP response
+     * returns immediately (non-blocking) while the pipeline runs in the background.
      */
     fun processWebhook(body: ChatwootWebhookBody) {
         applicationScope.launch {
             try {
                 doProcessWebhook(body)
             } catch (e: Exception) {
+                metrics.pipelineError()
                 logger.error("Error processing webhook: ${e.message}", e)
             }
         }
@@ -68,7 +71,86 @@ class MessagePipelineService(
         val contactId = body.conversation.contactInbox.contactId
         val contactAttrs = body.conversation.customAttributes
 
-        // Audio flag from first attachment
+        // Structured logging context
+        MDC.put("waId", waId)
+        MDC.put("conversationId", conversationId?.toString() ?: "unknown")
+
+        try {
+            doProcessWithContext(
+                messageType, labels, waId, name, content, messageId,
+                accountId, conversationId, contactId, contactAttrs, body
+            )
+        } finally {
+            MDC.remove("waId")
+            MDC.remove("conversationId")
+        }
+    }
+
+    @Suppress("LongParameterList")
+    private suspend fun doProcessWithContext(
+        messageType: String,
+        labels: Set<String>,
+        waId: String,
+        name: String?,
+        content: String,
+        messageId: String,
+        accountId: Int,
+        conversationId: Int?,
+        contactId: Int?,
+        contactAttrs: Map<String, Any>,
+        body: ChatwootWebhookBody
+    ) {
+        val sessionId = waId
+
+        // ── 2. Route: /reset ───────────────────────────────────────────────────
+        if (content.lowercase().trim() == "/reset") {
+            resetConversation(sessionId, body)
+            return
+        }
+
+        // ── 3. Route: /teste ──────────────────────────────────────────────────
+        if (content.lowercase().trim() == "/teste" && conversationId != null) {
+            val newLabels = (labels + "testando-agente").toList()
+            chatwootGateway.updateLabels(accountId, conversationId, newLabels)
+            chatwootGateway.sendMessage(accountId, conversationId, "Modo de teste habilitado.")
+            return
+        }
+
+        // ── 4. Filter: only incoming messages, no blocked labels ──────────────
+        if (messageType != "incoming") return
+        if (labels.intersect(BLOCKED_LABELS).isNotEmpty()) {
+            metrics.messageBlocked("label")
+            return
+        }
+
+        // ── 5. Gate: user must be registered and active ────────────────────────
+        val userEntity = userRepository.findByWaId(waId)
+
+        if (userEntity == null) {
+            metrics.messageBlocked("unregistered")
+            if (conversationId != null) {
+                chatwootGateway.sendMessage(
+                    accountId, conversationId,
+                    "👋 Olá! Para usar o Koalla, cadastre-se em *koalla.ai*\n\n" +
+                    "É rápido e o primeiro acesso é grátis por 7 dias 🐨"
+                )
+            }
+            return
+        }
+
+        if (!userEntity.isActive) {
+            metrics.messageBlocked("inactive")
+            if (conversationId != null) {
+                chatwootGateway.sendMessage(
+                    accountId, conversationId,
+                    "Sua assinatura está inativa. Para continuar usando o Koalla, " +
+                    "acesse *koalla.ai/planos* e escolha um plano 🐨"
+                )
+            }
+            return
+        }
+
+        // ── 6. Resolve message text (text / file / audio) ─────────────────────
         var isAudio = false
         val attachment = body.attachments.firstOrNull()
         if (attachment != null) {
@@ -85,54 +167,6 @@ class MessagePipelineService(
             }
         }
 
-        val sessionId = waId // mirrors n8n session key
-
-        // ── 2. Route: /reset ───────────────────────────────────────────────────
-        if (content.lowercase().trim() == "/reset") {
-            resetConversation(sessionId, body)
-            return
-        }
-
-        // ── 3. Route: /teste ──────────────────────────────────────────────────
-        if (content.lowercase().trim() == "/teste" && conversationId != null) {
-            val newLabels = (labels + "testando-agente").toList()
-            chatwootClient.updateLabels(accountId, conversationId, newLabels)
-            chatwootClient.sendMessage(accountId, conversationId, "Modo de teste habilitado.")
-            return
-        }
-
-        // ── 4. Filter: only process valid incoming messages ────────────────────
-        if (messageType != "incoming") return
-        if (labels.intersect(BLOCKED_LABELS).isNotEmpty()) return
-
-        // ── 5. Gate: user must be registered and active ────────────────────────
-        val user = userRepository.findByWaId(waId)
-
-        if (user == null) {
-            if (conversationId != null) {
-                chatwootClient.sendMessage(
-                    accountId,
-                    conversationId,
-                    "👋 Olá! Para usar o Koalla, cadastre-se em *koalla.ai*\n\n" +
-                    "É rápido e o primeiro acesso é grátis por 7 dias 🐨"
-                )
-            }
-            return
-        }
-
-        if (!user.isActive) {
-            if (conversationId != null) {
-                chatwootClient.sendMessage(
-                    accountId,
-                    conversationId,
-                    "Sua assinatura está inativa. Para continuar usando o Koalla, " +
-                    "acesse *koalla.ai/planos* e escolha um plano 🐨"
-                )
-            }
-            return
-        }
-
-        // ── 6. Resolve message text (text / file / audio) ─────────────────────
         var resolvedContent = content
         var fileInfo = ""
 
@@ -141,59 +175,50 @@ class MessagePipelineService(
         }
 
         if (isAudio && attachment?.dataUrl != null) {
-            val audioBytes = chatwootClient.downloadAttachment(attachment.dataUrl)
+            val audioBytes = chatwootGateway.downloadAttachment(attachment.dataUrl)
             if (audioBytes != null) {
                 resolvedContent = audioService.transcribe(audioBytes)
             }
         } else if (resolvedContent.isEmpty() && fileInfo.isNotEmpty()) {
             resolvedContent = fileInfo
         } else {
-            resolvedContent = (resolvedContent) + fileInfo
+            resolvedContent = resolvedContent + fileInfo
         }
 
         // ── 7. Enqueue message ────────────────────────────────────────────────
         enqueueMessage(sessionId, messageId, resolvedContent)
 
-        // ── 8. Debounce: wait then check if this is still the latest message ──
+        // ── 8. Debounce ───────────────────────────────────────────────────────
         delay((props.messageQueueWaitSeconds * 1000).toLong())
 
         val queue = fetchQueue(sessionId)
         if (queue.isEmpty() || queue.last().messageId != messageId) {
-            // A newer message arrived — let that execution handle it
             return
         }
 
-        // ── 9. Conversation lock: wait if agent is already responding ─────────
+        // ── 9. Lock: wait if agent is already responding ──────────────────────
         var lockAttempts = 0
         while (lockAttempts < 5 && getStatus(sessionId)?.lockConversa == true) {
             delay((props.messageQueueWaitSeconds * 10 * 1000).toLong())
             lockAttempts++
         }
 
-        if (getStatus(sessionId)?.lockConversa == true) {
-            // Gave up waiting after 5 attempts
-            return
-        }
+        if (getStatus(sessionId)?.lockConversa == true) return
 
-        // ── 10. Lock conversation & clear queue ───────────────────────────────
+        // ── 10. Lock & clear queue ────────────────────────────────────────────
         lockConversation(sessionId)
         clearQueue(sessionId)
 
-        // Collect all queued messages into one
         val combinedMessage = queue.joinToString("\n") { it.message }
 
         // ── 11. Mark as read ──────────────────────────────────────────────────
         if (conversationId != null) {
-            chatwootClient.markAsRead(accountId, conversationId)
+            chatwootGateway.markAsRead(accountId, conversationId)
         }
 
         // ── 12. Build agent context ───────────────────────────────────────────
         val contactData = if (contactId != null) {
-            try {
-                chatwootClient.getContact(accountId, contactId)
-            } catch (e: Exception) {
-                null
-            }
+            try { chatwootGateway.getContact(accountId, contactId) } catch (e: Exception) { null }
         } else null
 
         @Suppress("UNCHECKED_CAST")
@@ -201,7 +226,7 @@ class MessagePipelineService(
             ?.get("custom_attributes") as? Map<String, Any> ?: contactAttrs
 
         val agentContext = AgentContext(
-            userId = user.id!!,
+            userId = userEntity.id!!,
             waId = waId,
             accountId = accountId,
             conversationId = conversationId ?: 0,
@@ -214,11 +239,17 @@ class MessagePipelineService(
         )
 
         // ── 13. Run agent ─────────────────────────────────────────────────────
+        val msgType = if (isAudio) "audio" else "text"
+        metrics.messageProcessed(msgType)
+
+        val agentStart = System.nanoTime()
         val output = try {
             koallaAgent.runAgent(combinedMessage, sessionId, agentContext)
         } catch (e: Exception) {
             unlockConversation(sessionId)
             throw e
+        } finally {
+            metrics.agentTimer().record(System.nanoTime() - agentStart, java.util.concurrent.TimeUnit.NANOSECONDS)
         }
 
         if (output.isNullOrEmpty() || output == "Agent stopped due to max iterations.") {
@@ -226,14 +257,13 @@ class MessagePipelineService(
             return
         }
 
-        // ── 14. Format output for WhatsApp ────────────────────────────────────
+        // ── 14. Format output ─────────────────────────────────────────────────
         val formatted = koallaAgent.formatForWhatsApp(output)
 
         // ── 15. Send response ─────────────────────────────────────────────────
         if (conversationId != null) {
-            val chunks = splitMessage(formatted)
-            for (chunk in chunks) {
-                chatwootClient.sendMessage(accountId, conversationId, chunk)
+            splitMessage(formatted).forEach { chunk ->
+                chatwootGateway.sendMessage(accountId, conversationId, chunk)
             }
         }
 
@@ -246,27 +276,20 @@ class MessagePipelineService(
     @Transactional
     fun enqueueMessage(waId: String, messageId: String, message: String) {
         messageQueueRepository.save(
-            MessageQueue(
-                waId = waId,
-                messageId = messageId,
-                message = message,
-                timestamp = OffsetDateTime.now()
-            )
+            MessageQueue(waId = waId, messageId = messageId, message = message, timestamp = OffsetDateTime.now())
         )
     }
 
-    fun fetchQueue(waId: String): List<MessageQueue> {
-        return messageQueueRepository.findByWaIdOrderByTimestampAsc(waId)
-    }
+    fun fetchQueue(waId: String): List<MessageQueue> =
+        messageQueueRepository.findByWaIdOrderByTimestampAsc(waId)
 
     @Transactional
     fun clearQueue(waId: String) {
         messageQueueRepository.deleteByWaId(waId)
     }
 
-    fun getStatus(sessionId: String): ConversationStatus? {
-        return conversationStatusRepository.findBySessionId(sessionId)
-    }
+    fun getStatus(sessionId: String): ConversationStatus? =
+        conversationStatusRepository.findBySessionId(sessionId)
 
     @Transactional
     fun lockConversation(sessionId: String) {
@@ -279,12 +302,7 @@ class MessagePipelineService(
             conversationStatusRepository.save(existing)
         } else {
             conversationStatusRepository.save(
-                ConversationStatus(
-                    sessionId = sessionId,
-                    lockConversa = true,
-                    aguardandoFollowup = true,
-                    numeroFollowup = 0
-                )
+                ConversationStatus(sessionId = sessionId, lockConversa = true, aguardandoFollowup = true, numeroFollowup = 0)
             )
         }
     }
@@ -299,12 +317,7 @@ class MessagePipelineService(
             conversationStatusRepository.save(existing)
         } else {
             conversationStatusRepository.save(
-                ConversationStatus(
-                    sessionId = sessionId,
-                    lockConversa = false,
-                    aguardandoFollowup = false,
-                    numeroFollowup = 0
-                )
+                ConversationStatus(sessionId = sessionId, lockConversa = false, aguardandoFollowup = false, numeroFollowup = 0)
             )
         }
     }
@@ -315,35 +328,24 @@ class MessagePipelineService(
         val conversationId = body.conversation.id
         val contactId = body.conversation.contactInbox.contactId
 
-        // Clear chat history (memory)
         chatHistoryRepository.deleteBySessionId(sessionId)
-
-        // Clear queue
         clearQueue(sessionId)
-
-        // Reset conversation status
         unlockConversation(sessionId)
 
-        // Chatwoot: remove custom attributes
         if (accountId != null && contactId != null) {
-            chatwootClient.destroyContactAttributes(
+            chatwootGateway.destroyContactAttributes(
                 accountId, contactId,
                 listOf("preferencia_audio_texto", "asaas_id_cliente", "asaas_id_cobranca", "asaas_status_cobranca")
             )
         }
 
-        // Chatwoot: remove agente-off label
         if (accountId != null && conversationId != null) {
-            val currentLabels = body.conversation.labels
-            val cleanLabels = currentLabels.filter { it != "agente-off" }
-            chatwootClient.updateLabels(accountId, conversationId, cleanLabels)
-            chatwootClient.sendMessage(accountId, conversationId, "Memória resetada.")
+            val cleanLabels = body.conversation.labels.filter { it != "agente-off" }
+            chatwootGateway.updateLabels(accountId, conversationId, cleanLabels)
+            chatwootGateway.sendMessage(accountId, conversationId, "Memória resetada.")
         }
     }
 
-    /**
-     * Split a long message into WhatsApp-safe chunks at sentence boundaries.
-     */
     fun splitMessage(text: String, maxLen: Int = 4096): List<String> {
         if (text.length <= maxLen) return listOf(text)
 
@@ -355,14 +357,9 @@ class MessagePipelineService(
                 chunks.add(remaining)
                 break
             }
-
             var splitAt = remaining.lastIndexOf("\n\n", maxLen)
-            if (splitAt == -1) {
-                splitAt = remaining.lastIndexOf(". ", maxLen)
-            }
-            if (splitAt == -1) {
-                splitAt = maxLen
-            }
+            if (splitAt == -1) splitAt = remaining.lastIndexOf(". ", maxLen)
+            if (splitAt == -1) splitAt = maxLen
 
             chunks.add(remaining.substring(0, splitAt).trim())
             remaining = remaining.substring(splitAt).trim()
@@ -371,17 +368,3 @@ class MessagePipelineService(
         return chunks
     }
 }
-
-data class AgentContext(
-    val userId: java.util.UUID,
-    val waId: String,
-    val accountId: Int,
-    val conversationId: Int,
-    val contactId: Int,
-    val messageId: Int,
-    val contactName: String,
-    val labels: List<String>,
-    val contactCustomAttributes: Map<String, Any>,
-    val alertConversationId: String
-)
-

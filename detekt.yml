@@ -1,0 +1,43 @@
+build:
+  maxIssues: 0
+
+config:
+  validation: true
+  warningsAsErrors: false
+
+style:
+  MagicNumber:
+    active: false
+  WildcardImport:
+    active: true
+  UnusedImports:
+    active: true
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+  ForbiddenComment:
+    active: false
+
+complexity:
+  LongMethod:
+    threshold: 80
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 8
+  ComplexMethod:
+    threshold: 20
+
+naming:
+  FunctionNaming:
+    active: true
+    functionPattern: '[a-z][a-zA-Z0-9]*'
+    excludes: ['**/tools/**']  # Spring AI @Bean functions have non-standard names
+
+performance:
+  active: true
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false  # Gateway adapters intentionally catch Exception
+  SwallowedException:
+    active: false

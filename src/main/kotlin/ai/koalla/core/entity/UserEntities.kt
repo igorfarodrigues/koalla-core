@@ -6,7 +6,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "users", schema = "koalla")
-class User(
+class UserEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     var id: UUID? = null,
@@ -31,6 +31,7 @@ class User(
     @Column(name = "created_at", updatable = false)
     var createdAt: OffsetDateTime = OffsetDateTime.now(),
 
+    /** DB column is "update_at" (typo kept for backward compat). Domain model exposes it as "updatedAt". */
     @Column(name = "update_at")
     var updateAt: OffsetDateTime = OffsetDateTime.now()
 ) {
@@ -42,7 +43,7 @@ class User(
 
 @Entity
 @Table(name = "auth", schema = "koalla")
-class Auth(
+class AuthEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     var id: UUID? = null,
@@ -65,7 +66,7 @@ class Auth(
 
 @Entity
 @Table(name = "user_states", schema = "koalla")
-class UserState(
+class UserStateEntity(
     @Id
     @Column(name = "user_id")
     var userId: UUID,
@@ -84,4 +85,3 @@ class UserState(
         updatedAt = OffsetDateTime.now()
     }
 }
-

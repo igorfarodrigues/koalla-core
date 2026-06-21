@@ -2,7 +2,7 @@ package ai.koalla.core.agent
 
 import ai.koalla.core.config.KoallaProperties
 import ai.koalla.core.repository.ChatHistoryRepository
-import ai.koalla.core.service.AgentContext
+import ai.koalla.core.domain.AgentContext
 import ai.koalla.core.tools.ToolContextHolder
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory

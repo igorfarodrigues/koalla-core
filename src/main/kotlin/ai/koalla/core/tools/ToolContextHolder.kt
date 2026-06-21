@@ -1,6 +1,6 @@
 package ai.koalla.core.tools
 
-import ai.koalla.core.service.AgentContext
+import ai.koalla.core.domain.AgentContext
 import org.springframework.stereotype.Component
 
 /**

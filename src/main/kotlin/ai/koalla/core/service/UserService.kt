@@ -1,8 +1,9 @@
 package ai.koalla.core.service
 
-import ai.koalla.core.dto.UserDeactivateResponse
-import ai.koalla.core.dto.UserResponse
-import ai.koalla.core.entity.User
+import ai.koalla.core.domain.User
+import ai.koalla.core.entity.UserEntity
+import ai.koalla.core.exception.UserNotFoundException
+import ai.koalla.core.mapper.toDomain
 import ai.koalla.core.repository.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -13,78 +14,58 @@ class UserService(
     private val userRepository: UserRepository
 ) {
 
-    fun findByWaId(waId: String): User? {
-        return userRepository.findByWaId(waId)
-    }
+    fun findByWaId(waId: String): User? =
+        userRepository.findByWaId(waId)?.toDomain()
 
-    fun findById(id: UUID): User? {
-        return userRepository.findById(id).orElse(null)
-    }
+    fun findById(id: UUID): User? =
+        userRepository.findById(id).orElse(null)?.toDomain()
 
-    fun findByEmail(email: String): User? {
-        return userRepository.findByEmail(email)
-    }
+    fun findByEmail(email: String): User? =
+        userRepository.findByEmail(email)?.toDomain()
 
     @Transactional
-    fun createUser(waId: String, fullName: String? = null, email: String? = null): User {
-        val user = User(
+    fun createUser(
+        waId: String,
+        fullName: String? = null,
+        email: String? = null,
+        planType: String = "FREE",
+        isActive: Boolean = true
+    ): User {
+        val entity = UserEntity(
             waId = waId,
             fullName = fullName,
-            email = email
+            email = email,
+            planType = planType,
+            isActive = isActive
         )
-        return userRepository.save(user)
+        return userRepository.save(entity).toDomain()
     }
 
     @Transactional
-    fun getOrCreateByWaId(waId: String, fullName: String? = null): User {
-        return findByWaId(waId) ?: createUser(waId, fullName)
-    }
+    fun getOrCreateByWaId(waId: String, fullName: String? = null): User =
+        findByWaId(waId) ?: createUser(waId, fullName)
 
     @Transactional
-    fun deactivate(userId: UUID): UserDeactivateResponse {
-        val user = userRepository.findById(userId)
-            .orElseThrow { IllegalArgumentException("User not found: $userId") }
-
-        user.isActive = false
-        userRepository.save(user)
-
-        return UserDeactivateResponse(
-            id = user.id!!,
-            isActive = false,
-            message = "User deactivated successfully"
-        )
+    fun deactivate(userId: UUID): User {
+        val entity = userRepository.findById(userId)
+            .orElseThrow { UserNotFoundException(userId.toString()) }
+        entity.isActive = false
+        return userRepository.save(entity).toDomain()
     }
 
     @Transactional
     fun activate(userId: UUID): User {
-        val user = userRepository.findById(userId)
-            .orElseThrow { IllegalArgumentException("User not found: $userId") }
-
-        user.isActive = true
-        return userRepository.save(user)
+        val entity = userRepository.findById(userId)
+            .orElseThrow { UserNotFoundException(userId.toString()) }
+        entity.isActive = true
+        return userRepository.save(entity).toDomain()
     }
 
     @Transactional
     fun updatePlan(userId: UUID, planType: String): User {
-        val user = userRepository.findById(userId)
-            .orElseThrow { IllegalArgumentException("User not found: $userId") }
-
-        user.planType = planType.uppercase()
-        return userRepository.save(user)
-    }
-
-    fun toResponse(user: User): UserResponse {
-        return UserResponse(
-            id = user.id!!,
-            waId = user.waId,
-            fullName = user.fullName,
-            email = user.email,
-            planType = user.planType,
-            lifetime = user.lifetime,
-            isActive = user.isActive,
-            createdAt = user.createdAt,
-            updateAt = user.updateAt
-        )
+        val entity = userRepository.findById(userId)
+            .orElseThrow { UserNotFoundException(userId.toString()) }
+        entity.planType = planType.uppercase()
+        return userRepository.save(entity).toDomain()
     }
 }
-

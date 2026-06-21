@@ -1,8 +1,8 @@
 package ai.koalla.core.repository
 
-import ai.koalla.core.entity.Category
-import ai.koalla.core.entity.CategoryKeyword
-import ai.koalla.core.entity.Transaction
+import ai.koalla.core.entity.CategoryEntity
+import ai.koalla.core.entity.CategoryKeywordEntity
+import ai.koalla.core.entity.TransactionEntity
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
@@ -11,27 +11,27 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 @Repository
-interface CategoryRepository : JpaRepository<Category, Int> {
-    fun findByUserId(userId: UUID): List<Category>
-    fun findByUserIdIsNull(): List<Category>
+interface CategoryRepository : JpaRepository<CategoryEntity, Int> {
+    fun findByUserId(userId: UUID): List<CategoryEntity>
+    fun findByUserIdIsNull(): List<CategoryEntity>
 }
 
 @Repository
-interface CategoryKeywordRepository : JpaRepository<CategoryKeyword, Int> {
-    fun findByCategoryId(categoryId: Int): List<CategoryKeyword>
+interface CategoryKeywordRepository : JpaRepository<CategoryKeywordEntity, Int> {
+    fun findByCategoryId(categoryId: Int): List<CategoryKeywordEntity>
 }
 
 @Repository
-interface TransactionRepository : JpaRepository<Transaction, UUID> {
+interface TransactionRepository : JpaRepository<TransactionEntity, UUID> {
 
-    fun findByUserIdOrderByOccurredAtDesc(userId: UUID, pageable: Pageable): List<Transaction>
+    fun findByUserIdOrderByOccurredAtDesc(userId: UUID, pageable: Pageable): List<TransactionEntity>
 
-    fun findByUserIdOrderByCreatedAtDesc(userId: UUID, pageable: Pageable): List<Transaction>
+    fun findByUserIdOrderByCreatedAtDesc(userId: UUID, pageable: Pageable): List<TransactionEntity>
 
     @Query("""
-        SELECT t FROM Transaction t 
-        WHERE t.userId = :userId 
-        AND t.occurredAt >= :startDate 
+        SELECT t FROM TransactionEntity t
+        WHERE t.userId = :userId
+        AND t.occurredAt >= :startDate
         AND t.occurredAt < :endDate
         ORDER BY t.occurredAt DESC
     """)
@@ -39,13 +39,13 @@ interface TransactionRepository : JpaRepository<Transaction, UUID> {
         userId: UUID,
         startDate: OffsetDateTime,
         endDate: OffsetDateTime
-    ): List<Transaction>
+    ): List<TransactionEntity>
 
     @Query("""
-        SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t 
-        WHERE t.userId = :userId 
+        SELECT COALESCE(SUM(t.amount), 0) FROM TransactionEntity t
+        WHERE t.userId = :userId
         AND t.movement = 'CASH_IN'
-        AND t.occurredAt >= :startDate 
+        AND t.occurredAt >= :startDate
         AND t.occurredAt < :endDate
     """)
     fun sumCashInByUserIdAndPeriod(
@@ -55,10 +55,10 @@ interface TransactionRepository : JpaRepository<Transaction, UUID> {
     ): Long
 
     @Query("""
-        SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t 
-        WHERE t.userId = :userId 
+        SELECT COALESCE(SUM(t.amount), 0) FROM TransactionEntity t
+        WHERE t.userId = :userId
         AND t.movement = 'CASH_OUT'
-        AND t.occurredAt >= :startDate 
+        AND t.occurredAt >= :startDate
         AND t.occurredAt < :endDate
     """)
     fun sumCashOutByUserIdAndPeriod(
@@ -67,4 +67,3 @@ interface TransactionRepository : JpaRepository<Transaction, UUID> {
         endDate: OffsetDateTime
     ): Long
 }
-

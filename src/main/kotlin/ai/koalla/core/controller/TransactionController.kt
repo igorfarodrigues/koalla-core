@@ -2,6 +2,7 @@ package ai.koalla.core.controller
 
 import ai.koalla.core.dto.TransactionCreateRequest
 import ai.koalla.core.dto.TransactionResponse
+import ai.koalla.core.mapper.toResponse
 import ai.koalla.core.service.TransactionService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -25,10 +26,7 @@ class TransactionController(
 ) {
 
     @PostMapping
-    @Operation(
-        summary = "Criar transação",
-        description = "Registra uma nova transação financeira (receita ou despesa)"
-    )
+    @Operation(summary = "Criar transação")
     @ApiResponses(value = [
         ApiResponse(responseCode = "201", description = "Transação criada",
             content = [Content(schema = Schema(implementation = TransactionResponse::class))]),
@@ -38,15 +36,11 @@ class TransactionController(
         @Valid @RequestBody request: TransactionCreateRequest
     ): ResponseEntity<TransactionResponse> {
         val transaction = transactionService.create(request)
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(transactionService.toResponse(transaction))
+        return ResponseEntity.status(HttpStatus.CREATED).body(transaction.toResponse())
     }
 
     @GetMapping("/user/{userId}")
-    @Operation(
-        summary = "Listar transações do usuário",
-        description = "Retorna as transações mais recentes de um usuário, ordenadas por data"
-    )
+    @Operation(summary = "Listar transações do usuário")
     @ApiResponses(value = [
         ApiResponse(responseCode = "200", description = "Lista de transações",
             content = [Content(array = ArraySchema(schema = Schema(implementation = TransactionResponse::class)))])
@@ -54,18 +48,15 @@ class TransactionController(
     fun listUserTransactions(
         @Parameter(description = "UUID do usuário")
         @PathVariable userId: UUID,
-        @Parameter(description = "Quantidade máxima de transações a retornar")
+        @Parameter(description = "Quantidade máxima")
         @RequestParam(defaultValue = "50") limit: Int
     ): ResponseEntity<List<TransactionResponse>> {
         val transactions = transactionService.listByUser(userId, limit)
-        return ResponseEntity.ok(transactions.map { transactionService.toResponse(it) })
+        return ResponseEntity.ok(transactions.map { it.toResponse() })
     }
 
     @DeleteMapping("/{transactionId}")
-    @Operation(
-        summary = "Excluir transação",
-        description = "Remove uma transação do histórico do usuário"
-    )
+    @Operation(summary = "Excluir transação")
     @ApiResponses(value = [
         ApiResponse(responseCode = "200", description = "Transação excluída"),
         ApiResponse(responseCode = "404", description = "Transação não encontrada")

@@ -2,10 +2,11 @@ package ai.koalla.core.controller
 
 import ai.koalla.core.config.KoallaProperties
 import ai.koalla.core.dto.AsaasWebhookPayload
-import ai.koalla.core.util.secureCompare
 import ai.koalla.core.dto.CancelSubscriptionResponse
-import ai.koalla.core.repository.UserRepository
+import ai.koalla.core.exception.UserNotFoundException
 import ai.koalla.core.service.BillingService
+import ai.koalla.core.service.UserService
+import ai.koalla.core.util.secureCompare
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -22,13 +23,14 @@ import org.springframework.web.bind.annotation.*
 
 /**
  * POST /webhook/asaas — receives billing events from Asaas.
+ * POST /webhook/cancel-subscription/{waId} — internal subscription cancellation.
  */
 @RestController
 @RequestMapping("/webhook")
 @Tag(name = "Webhooks", description = "Endpoints para receber webhooks de integrações externas")
 class BillingWebhookController(
     private val billingService: BillingService,
-    private val userRepository: UserRepository,
+    private val userService: UserService,
     private val props: KoallaProperties
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -43,15 +45,12 @@ class BillingWebhookController(
     @Operation(
         summary = "Recebe webhooks do Asaas",
         description = """
-            Endpoint que recebe eventos de cobrança do Asaas.
-            
-            **Eventos tratados:**
+            Eventos tratados:
             - PAYMENT_CONFIRMED / PAYMENT_RECEIVED → ativa usuário
             - PAYMENT_OVERDUE / PAYMENT_CREDIT_CARD_CAPTURE_REFUSED → marca atraso
             - SUBSCRIPTION_DELETED / SUBSCRIPTION_INACTIVATED → cancela assinatura
-            
-            **Idempotência:**
-            - Eventos duplicados são ignorados via webhook_events table
+
+            Idempotência garantida via webhook_events table.
         """
     )
     @ApiResponses(value = [
@@ -64,7 +63,6 @@ class BillingWebhookController(
         @RequestHeader("asaas-access-token", required = false) token: String?,
         request: HttpServletRequest
     ): ResponseEntity<Map<String, String>> {
-        // Validate token
         if (props.asaas.webhookToken.isNotEmpty()) {
             if (token == null || !secureCompare(token, props.asaas.webhookToken)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -75,7 +73,6 @@ class BillingWebhookController(
         val event = payload.event
         val eventId = payload.id
 
-        // Idempotency check
         if (eventId.isNotEmpty() && billingService.isEventAlreadyProcessed(eventId)) {
             return ResponseEntity.ok(mapOf("status" to "duplicate", "event" to event))
         }
@@ -84,21 +81,14 @@ class BillingWebhookController(
         val subscriptionId = payload.payment?.subscription
 
         when {
-            event in PAYMENT_OK_EVENTS -> {
-                billingService.handlePaymentConfirmed(paymentId, subscriptionId)
-            }
-            event in PAYMENT_FAIL_EVENTS -> {
-                billingService.handlePaymentOverdue(paymentId, subscriptionId)
-            }
+            event in PAYMENT_OK_EVENTS -> billingService.handlePaymentConfirmed(paymentId, subscriptionId)
+            event in PAYMENT_FAIL_EVENTS -> billingService.handlePaymentOverdue(paymentId, subscriptionId)
             event in SUBSCRIPTION_END_EVENTS -> {
                 val subId = payload.subscription?.id ?: subscriptionId
-                if (subId != null) {
-                    billingService.handleSubscriptionDeleted(subId)
-                }
+                if (subId != null) billingService.handleSubscriptionDeleted(subId)
             }
         }
 
-        // Mark event as processed
         if (eventId.isNotEmpty()) {
             billingService.markEventProcessed(eventId, event)
         }
@@ -116,35 +106,26 @@ class BillingWebhookController(
             content = [Content(schema = Schema(implementation = CancelSubscriptionResponse::class))]),
         ApiResponse(responseCode = "401", description = "Secret inválido ou ausente"),
         ApiResponse(responseCode = "404", description = "Usuário não encontrado"),
-        ApiResponse(responseCode = "400", description = "Erro ao cancelar")
+        ApiResponse(responseCode = "400", description = "Sem assinatura ativa")
     ])
     fun cancelSubscription(
         @Parameter(description = "Número WhatsApp do usuário")
         @PathVariable waId: String,
         @Parameter(description = "Secret de autenticação")
         @RequestHeader("X-Koalla-Secret", required = false) secret: String?
-    ): ResponseEntity<Any> {
+    ): ResponseEntity<CancelSubscriptionResponse> {
         if (!secureCompare(secret ?: "", props.chatwoot.webhookSecret)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(mapOf("error" to "Unauthorized"))
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
         }
 
-        val user = userRepository.findByWaId(waId)
-            ?: return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(mapOf("error" to "User not found"))
+        // UserNotFoundException → 404 via GlobalExceptionHandler
+        val user = userService.findByWaId(waId) ?: throw UserNotFoundException(waId)
 
-        return try {
-            val result = runBlocking {
-                billingService.cancelUserSubscription(user)
-            }
-            ResponseEntity.ok(CancelSubscriptionResponse(
-                success = result.success,
-                subscriptionId = result.subscriptionId
-            ))
-        } catch (e: IllegalStateException) {
-            ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(mapOf("error" to e.message))
-        }
+        // SubscriptionNotFoundException → 400 via GlobalExceptionHandler
+        val result = runBlocking { billingService.cancelUserSubscription(user) }
+
+        return ResponseEntity.ok(
+            CancelSubscriptionResponse(success = result.success, subscriptionId = result.subscriptionId)
+        )
     }
-
 }

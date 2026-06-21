@@ -1,11 +1,17 @@
 package ai.koalla.core.service
 
-import ai.koalla.core.client.AsaasClient
-import ai.koalla.core.client.ChatwootClient
+import ai.koalla.core.domain.User
+import ai.koalla.core.entity.AsaasCustomer
+import ai.koalla.core.entity.Invoice
+import ai.koalla.core.entity.SubStatus
+import ai.koalla.core.entity.Subscription
+import ai.koalla.core.exception.SubscriptionNotFoundException
+import ai.koalla.core.exception.UserNotFoundException
+import ai.koalla.core.gateway.AsaasGateway
+import ai.koalla.core.gateway.ChatwootGateway
 import ai.koalla.core.config.KoallaProperties
 import ai.koalla.core.dto.CardData
 import ai.koalla.core.dto.CardHolderInfo
-import ai.koalla.core.entity.*
 import ai.koalla.core.repository.*
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -21,7 +27,7 @@ import java.util.UUID
  *   1. Creates/retrieves customer in Asaas
  *   2. Creates recurring subscription with trialEndDate
  *   3. Persists AsaasCustomer + Subscription + Invoice in database
- *   4. Activates user (is_active=True, plan_type=plan, status=TRIALING)
+ *   4. Activates user (isActive=true, planType=plan, status=TRIALING)
  *
  * Grace period:
  *   When a payment is late, the user gets 48h before being deactivated.
@@ -34,15 +40,14 @@ class BillingService(
     private val subscriptionRepository: SubscriptionRepository,
     private val invoiceRepository: InvoiceRepository,
     private val webhookEventRepository: WebhookEventRepository,
-    private val asaasClient: AsaasClient,
-    private val chatwootClient: ChatwootClient,
+    private val asaasGateway: AsaasGateway,
+    private val chatwootGateway: ChatwootGateway,
     private val props: KoallaProperties
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    /**
-     * Entry point called by /auth/signup.
-     */
+    // ── Signup ────────────────────────────────────────────────────────────────
+
     @Transactional
     suspend fun startTrial(
         user: User,
@@ -53,28 +58,25 @@ class BillingService(
         val planUpper = plan.uppercase()
 
         // 1. Asaas customer
-        val existingCustomer = asaasCustomerRepository.findByUserId(user.id!!)
+        val existingCustomer = asaasCustomerRepository.findByUserId(user.id)
         val asaasCustomerId: String
 
         if (existingCustomer != null) {
             asaasCustomerId = existingCustomer.asaasCustomerId
         } else {
-            val customer = asaasClient.getOrCreateCustomer(
+            val customer = asaasGateway.getOrCreateCustomer(
                 name = user.fullName ?: "",
                 phone = user.waId,
                 email = user.email
             )
             asaasCustomerId = customer["id"] as String
             asaasCustomerRepository.save(
-                AsaasCustomer(
-                    userId = user.id!!,
-                    asaasCustomerId = asaasCustomerId
-                )
+                AsaasCustomer(userId = user.id, asaasCustomerId = asaasCustomerId)
             )
         }
 
         // 2. Asaas subscription
-        val subscriptionData = asaasClient.createSubscription(
+        val subscriptionData = asaasGateway.createSubscription(
             customerId = asaasCustomerId,
             plan = planUpper,
             cardData = cardData,
@@ -86,19 +88,22 @@ class BillingService(
         val trialEnd = LocalDate.now().plusDays(props.trialDays.toLong())
 
         // 3. Persist subscription
-        val subscription = Subscription(
-            userId = user.id!!,
-            asaasSubscriptionId = asaasSubscriptionId,
-            status = SubStatus.TRIALING,
-            planName = planUpper,
-            nextDueDate = trialEnd
+        subscriptionRepository.save(
+            Subscription(
+                userId = user.id,
+                asaasSubscriptionId = asaasSubscriptionId,
+                status = SubStatus.TRIALING,
+                planName = planUpper,
+                nextDueDate = trialEnd
+            )
         )
-        subscriptionRepository.save(subscription)
 
-        // 4. Activate user
-        user.isActive = true
-        user.planType = planUpper
-        userRepository.save(user)
+        // 4. Activate user via entity
+        val userEntity = userRepository.findById(user.id)
+            .orElseThrow { UserNotFoundException(user.id.toString()) }
+        userEntity.isActive = true
+        userEntity.planType = planUpper
+        userRepository.save(userEntity)
 
         return TrialResult(
             subscriptionId = asaasSubscriptionId,
@@ -107,18 +112,14 @@ class BillingService(
         )
     }
 
-    /**
-     * Webhook PAYMENT_CONFIRMED / PAYMENT_RECEIVED:
-     * - Records invoice as paid
-     * - Ensures user is active
-     */
+    // ── Payment confirmed ─────────────────────────────────────────────────────
+
     @Transactional
     fun handlePaymentConfirmed(paymentId: String, subscriptionId: String?) {
         if (subscriptionId == null) return
 
         val subscription = subscriptionRepository.findByAsaasSubscriptionId(subscriptionId) ?: return
 
-        // Upsert invoice
         var invoice = invoiceRepository.findByAsaasPaymentId(paymentId)
         if (invoice == null) {
             invoice = Invoice(
@@ -133,47 +134,36 @@ class BillingService(
         }
         invoiceRepository.save(invoice)
 
-        // Ensure user is active and subscription ACTIVE
         subscription.status = SubStatus.ACTIVE
         subscription.graceExpiresAt = null
         subscriptionRepository.save(subscription)
 
-        val user = userRepository.findById(subscription.userId).orElse(null)
-        if (user != null && !user.isActive) {
-            user.isActive = true
-            userRepository.save(user)
+        userRepository.findById(subscription.userId).ifPresent { userEntity ->
+            if (!userEntity.isActive) {
+                userEntity.isActive = true
+                userRepository.save(userEntity)
+            }
         }
     }
 
-    /**
-     * Webhook PAYMENT_OVERDUE / PAYMENT_CREDIT_CARD_CAPTURE_REFUSED:
-     * - Upsert invoice as OVERDUE
-     * - Marks subscription as PAST_DUE with grace_expires_at = now + 48h
-     * - Notifies user via WhatsApp
-     * - Does NOT deactivate immediately — the job expireGracePeriods does that
-     */
+    // ── Payment overdue ───────────────────────────────────────────────────────
+
     @Transactional
     fun handlePaymentOverdue(paymentId: String, subscriptionId: String?) {
         if (subscriptionId == null) return
 
         val subscription = subscriptionRepository.findByAsaasSubscriptionId(subscriptionId) ?: return
 
-        // Set grace period only if not already PAST_DUE (avoid resetting timer)
         if (subscription.status != SubStatus.PAST_DUE) {
             subscription.status = SubStatus.PAST_DUE
             subscription.graceExpiresAt = OffsetDateTime.now().plusHours(props.graceHours.toLong())
             subscriptionRepository.save(subscription)
 
-            // Notify user via WhatsApp
-            val user = userRepository.findById(subscription.userId).orElse(null)
-            if (user != null) {
-                runBlocking {
-                    notifyPaymentOverdue(user.waId)
-                }
+            userRepository.findById(subscription.userId).ifPresent { userEntity ->
+                runBlocking { notifyPaymentOverdue(userEntity.waId) }
             }
         }
 
-        // Upsert invoice
         var invoice = invoiceRepository.findByAsaasPaymentId(paymentId)
         if (invoice != null) {
             invoice.status = "OVERDUE"
@@ -192,26 +182,23 @@ class BillingService(
     private suspend fun notifyPaymentOverdue(waId: String) {
         val message = """
             ⚠️ *Koalla — Pagamento pendente*
-            
+
             Identificamos um problema com a cobrança da sua assinatura.
-            
+
             Você tem *${props.graceHours} horas* para regularizar antes que o acesso seja suspenso.
-            
+
             Se precisar de ajuda, é só responder aqui. 🐨
         """.trimIndent()
-
         try {
-            chatwootClient.sendMessageToPhone(waId, message)
+            chatwootGateway.sendMessageToPhone(waId, message)
         } catch (e: Exception) {
             logger.warn("Failed to notify user $waId about overdue payment: ${e.message}")
         }
     }
 
-    /**
-     * Periodic job — deactivates users whose grace period has expired.
-     * Called by Spring Scheduler every hour.
-     */
-    @Scheduled(fixedRate = 3600000) // 1 hour in milliseconds
+    // ── Grace period expiry job ────────────────────────────────────────────────
+
+    @Scheduled(fixedRate = 3_600_000) // every hour
     @Transactional
     fun expireGracePeriods(): Int {
         val now = OffsetDateTime.now()
@@ -222,15 +209,13 @@ class BillingService(
             sub.status = SubStatus.CANCELED
             subscriptionRepository.save(sub)
 
-            val user = userRepository.findById(sub.userId).orElse(null)
-            if (user != null && user.isActive) {
-                user.isActive = false
-                userRepository.save(user)
-                deactivated++
-                logger.info("User ${user.waId} deactivated due to expired grace period")
-
-                runBlocking {
-                    notifyAccessRevoked(user.waId)
+            userRepository.findById(sub.userId).ifPresent { userEntity ->
+                if (userEntity.isActive) {
+                    userEntity.isActive = false
+                    userRepository.save(userEntity)
+                    deactivated++
+                    logger.info("User ${userEntity.waId} deactivated due to expired grace period")
+                    runBlocking { notifyAccessRevoked(userEntity.waId) }
                 }
             }
         }
@@ -238,32 +223,26 @@ class BillingService(
         if (deactivated > 0) {
             logger.info("Grace periods expired: $deactivated user(s) deactivated")
         }
-
         return deactivated
     }
 
     private suspend fun notifyAccessRevoked(waId: String) {
         val message = """
             🔒 *Koalla — Acesso suspenso*
-            
+
             Infelizmente não conseguimos processar o pagamento da sua assinatura e seu acesso foi suspenso.
-            
+
             Para reativar, entre em contato com o suporte. 🐨
         """.trimIndent()
-
         try {
-            chatwootClient.sendMessageToPhone(waId, message)
+            chatwootGateway.sendMessageToPhone(waId, message)
         } catch (e: Exception) {
             logger.warn("Failed to notify user $waId about suspension: ${e.message}")
         }
     }
 
-    /**
-     * Webhook SUBSCRIPTION_DELETED / SUBSCRIPTION_INACTIVATED:
-     * - Marks subscription as CANCELED
-     * - Deactivates user
-     * - Notifies user via WhatsApp
-     */
+    // ── Subscription deleted ──────────────────────────────────────────────────
+
     @Transactional
     fun handleSubscriptionDeleted(subscriptionId: String) {
         val subscription = subscriptionRepository.findByAsaasSubscriptionId(subscriptionId) ?: return
@@ -271,54 +250,47 @@ class BillingService(
         subscription.status = SubStatus.CANCELED
         subscriptionRepository.save(subscription)
 
-        val user = userRepository.findById(subscription.userId).orElse(null)
-        if (user != null && user.isActive) {
-            user.isActive = false
-            userRepository.save(user)
-            logger.info("User ${user.waId} deactivated due to subscription deletion/inactivation")
-            runBlocking {
-                notifyAccessRevoked(user.waId)
+        userRepository.findById(subscription.userId).ifPresent { userEntity ->
+            if (userEntity.isActive) {
+                userEntity.isActive = false
+                userRepository.save(userEntity)
+                logger.info("User ${userEntity.waId} deactivated due to subscription deletion/inactivation")
+                runBlocking { notifyAccessRevoked(userEntity.waId) }
             }
         }
     }
 
-    // ── Idempotency ───────────────────────────────────────────────────────────
+    // ── Cancel user subscription ──────────────────────────────────────────────
 
-    fun isEventAlreadyProcessed(eventId: String): Boolean {
-        return webhookEventRepository.existsByEventId(eventId)
-    }
-
-    @Transactional
-    fun markEventProcessed(eventId: String, eventType: String) {
-        webhookEventRepository.save(
-            WebhookEvent(
-                eventId = eventId,
-                eventType = eventType
-            )
-        )
-    }
-
-    /**
-     * Cancel user's active subscription.
-     */
     @Transactional
     suspend fun cancelUserSubscription(user: User): CancelResult {
-        val subscription = subscriptionRepository.findActiveByUserId(user.id!!)
-            ?: throw IllegalStateException("User has no active subscription")
+        val subscription = subscriptionRepository.findActiveByUserId(user.id)
+            ?: throw SubscriptionNotFoundException(user.id.toString())
 
-        asaasClient.cancelSubscription(subscription.asaasSubscriptionId!!)
+        asaasGateway.cancelSubscription(subscription.asaasSubscriptionId!!)
 
         subscription.status = SubStatus.CANCELED
         subscriptionRepository.save(subscription)
 
-        user.isActive = false
-        userRepository.save(user)
+        val userEntity = userRepository.findById(user.id)
+            .orElseThrow { UserNotFoundException(user.id.toString()) }
+        userEntity.isActive = false
+        userRepository.save(userEntity)
 
         logger.info("Subscription canceled. user=${user.waId} subscription=${subscription.asaasSubscriptionId}")
 
-        return CancelResult(
-            success = true,
-            subscriptionId = subscription.asaasSubscriptionId
+        return CancelResult(success = true, subscriptionId = subscription.asaasSubscriptionId)
+    }
+
+    // ── Idempotency ───────────────────────────────────────────────────────────
+
+    fun isEventAlreadyProcessed(eventId: String): Boolean =
+        webhookEventRepository.existsByEventId(eventId)
+
+    @Transactional
+    fun markEventProcessed(eventId: String, eventType: String) {
+        webhookEventRepository.save(
+            ai.koalla.core.entity.WebhookEvent(eventId = eventId, eventType = eventType)
         )
     }
 }
@@ -333,4 +305,3 @@ data class CancelResult(
     val success: Boolean,
     val subscriptionId: String?
 )
-

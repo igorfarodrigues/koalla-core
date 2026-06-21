@@ -1,11 +1,11 @@
 package ai.koalla.core.service
 
+import ai.koalla.core.domain.Transaction
 import ai.koalla.core.dto.TransactionCreateRequest
-import ai.koalla.core.dto.TransactionResponse
 import ai.koalla.core.dto.TransactionSummary
-import ai.koalla.core.entity.Category
 import ai.koalla.core.entity.MovementType
-import ai.koalla.core.entity.Transaction
+import ai.koalla.core.entity.TransactionEntity
+import ai.koalla.core.mapper.toDomain
 import ai.koalla.core.repository.CategoryRepository
 import ai.koalla.core.repository.TransactionRepository
 import org.springframework.data.domain.PageRequest
@@ -24,7 +24,7 @@ class TransactionService(
 
     @Transactional
     fun create(request: TransactionCreateRequest): Transaction {
-        val transaction = Transaction(
+        val entity = TransactionEntity(
             userId = request.userId,
             description = request.description,
             amount = request.amount,
@@ -34,53 +34,41 @@ class TransactionService(
             source = request.source,
             occurredAt = request.occurredAt ?: OffsetDateTime.now()
         )
-        return transactionRepository.save(transaction)
+        return transactionRepository.save(entity).toDomain()
     }
 
-    fun listByUser(userId: UUID, limit: Int = 50): List<Transaction> {
-        return transactionRepository.findByUserIdOrderByOccurredAtDesc(
+    fun listByUser(userId: UUID, limit: Int = 50): List<Transaction> =
+        transactionRepository.findByUserIdOrderByOccurredAtDesc(
             userId,
             PageRequest.of(0, limit)
-        )
-    }
+        ).map { it.toDomain() }
 
-    fun findById(id: UUID): Transaction? {
-        return transactionRepository.findById(id).orElse(null)
-    }
+    fun findById(id: UUID): Transaction? =
+        transactionRepository.findById(id).orElse(null)?.toDomain()
 
     @Transactional
     fun delete(id: UUID): Boolean {
-        val transaction = transactionRepository.findById(id).orElse(null) ?: return false
-        transactionRepository.delete(transaction)
+        val entity = transactionRepository.findById(id).orElse(null) ?: return false
+        transactionRepository.delete(entity)
         return true
     }
 
-    /**
-     * Get transactions for a specific month.
-     */
     fun listByUserAndMonth(userId: UUID, year: Int, month: Int): List<Transaction> {
         val yearMonth = YearMonth.of(year, month)
-        val startDate = yearMonth.atDay(1).atStartOfDay().atOffset(ZoneOffset.UTC)
-        val endDate = yearMonth.plusMonths(1).atDay(1).atStartOfDay().atOffset(ZoneOffset.UTC)
-
-        return transactionRepository.findByUserIdAndPeriod(userId, startDate, endDate)
+        val start = yearMonth.atDay(1).atStartOfDay().atOffset(ZoneOffset.UTC)
+        val end = yearMonth.plusMonths(1).atDay(1).atStartOfDay().atOffset(ZoneOffset.UTC)
+        return transactionRepository.findByUserIdAndPeriod(userId, start, end).map { it.toDomain() }
     }
 
-    /**
-     * Get monthly summary with totals by category.
-     */
     fun getMonthlySummary(userId: UUID, year: Int, month: Int): TransactionSummary {
         val yearMonth = YearMonth.of(year, month)
-        val startDate = yearMonth.atDay(1).atStartOfDay().atOffset(ZoneOffset.UTC)
-        val endDate = yearMonth.plusMonths(1).atDay(1).atStartOfDay().atOffset(ZoneOffset.UTC)
+        val start = yearMonth.atDay(1).atStartOfDay().atOffset(ZoneOffset.UTC)
+        val end = yearMonth.plusMonths(1).atDay(1).atStartOfDay().atOffset(ZoneOffset.UTC)
 
-        val cashIn = transactionRepository.sumCashInByUserIdAndPeriod(userId, startDate, endDate)
-        val cashOut = transactionRepository.sumCashOutByUserIdAndPeriod(userId, startDate, endDate)
+        val cashIn = transactionRepository.sumCashInByUserIdAndPeriod(userId, start, end)
+        val cashOut = transactionRepository.sumCashOutByUserIdAndPeriod(userId, start, end)
 
-        // Get transactions for category breakdown
-        val transactions = transactionRepository.findByUserIdAndPeriod(userId, startDate, endDate)
-
-        // Get categories for names
+        val transactions = transactionRepository.findByUserIdAndPeriod(userId, start, end)
         val categoryIds = transactions.mapNotNull { it.categoryId }.distinct()
         val categories = if (categoryIds.isNotEmpty()) {
             categoryRepository.findAllById(categoryIds).associateBy { it.id }
@@ -91,12 +79,8 @@ class TransactionService(
         val byCategory = transactions
             .filter { it.movement == MovementType.CASH_OUT }
             .groupBy { it.categoryId }
-            .mapKeys { (categoryId, _) ->
-                categories[categoryId]?.name ?: "Outros"
-            }
-            .mapValues { (_, txs) ->
-                txs.sumOf { it.amount }
-            }
+            .mapKeys { (categoryId, _) -> categories[categoryId]?.name ?: "Outros" }
+            .mapValues { (_, txs) -> txs.sumOf { it.amount } }
 
         return TransactionSummary(
             totalCashIn = cashIn,
@@ -106,9 +90,6 @@ class TransactionService(
         )
     }
 
-    /**
-     * Register a transaction (used by the AI agent).
-     */
     @Transactional
     fun registerTransaction(
         userId: UUID,
@@ -118,14 +99,12 @@ class TransactionService(
         categoryName: String? = null,
         occurredAt: OffsetDateTime = OffsetDateTime.now()
     ): Transaction {
-        // Find or create category
         val categoryId = if (categoryName != null) {
-            val existingCategory = categoryRepository.findByUserIdIsNull()
-                .find { it.name.equals(categoryName, ignoreCase = true) }
-            existingCategory?.id
+            categoryRepository.findByUserIdIsNull()
+                .find { it.name.equals(categoryName, ignoreCase = true) }?.id
         } else null
 
-        val transaction = Transaction(
+        val entity = TransactionEntity(
             userId = userId,
             description = description,
             amount = amount,
@@ -133,23 +112,6 @@ class TransactionService(
             categoryId = categoryId,
             occurredAt = occurredAt
         )
-        return transactionRepository.save(transaction)
-    }
-
-    fun toResponse(transaction: Transaction): TransactionResponse {
-        return TransactionResponse(
-            id = transaction.id!!,
-            userId = transaction.userId,
-            description = transaction.description,
-            amount = transaction.amount,
-            movement = transaction.movement,
-            categoryId = transaction.categoryId,
-            entityType = transaction.entityType,
-            source = transaction.source,
-            occurredAt = transaction.occurredAt,
-            createdAt = transaction.createdAt,
-            updatedAt = transaction.updatedAt
-        )
+        return transactionRepository.save(entity).toDomain()
     }
 }
-

@@ -4,6 +4,8 @@ plugins {
 	kotlin("plugin.jpa") version "2.3.21"
 	id("org.springframework.boot") version "4.1.0"
 	id("io.spring.dependency-management") version "1.1.7"
+	id("io.gitlab.arturbosch.detekt") version "1.23.8"
+	jacoco
 }
 
 group = "ai.koalla"
@@ -53,12 +55,18 @@ dependencies {
 	// OpenAPI / Swagger UI
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
 
+	// Observability — Micrometer + Prometheus
+	runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+
 	// Test
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-security-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	testImplementation("com.h2database:h2")
+	testImplementation("io.mockk:mockk:1.13.13")
+	testImplementation("org.amshove.kluent:kluent:1.73")
+	testImplementation("org.wiremock:wiremock-standalone:3.13.0")
 }
 
 dependencyManagement {
@@ -73,6 +81,36 @@ kotlin {
 	}
 }
 
+// ── Detekt ────────────────────────────────────────────────────────────────────
+
+detekt {
+	buildUponDefaultConfig = true
+	allRules = false
+	config.setFrom(files("$rootDir/detekt.yml"))
+	autoCorrect = true
+}
+
+// ── Jacoco ────────────────────────────────────────────────────────────────────
+
+tasks.jacocoTestReport {
+	dependsOn(tasks.test)
+	reports {
+		xml.required = true
+		html.required = true
+	}
+}
+
+tasks.jacocoTestCoverageVerification {
+	violationRules {
+		rule {
+			limit {
+				minimum = "0.28".toBigDecimal()
+			}
+		}
+	}
+}
+
 tasks.withType<Test> {
 	useJUnitPlatform()
+	finalizedBy(tasks.jacocoTestReport)
 }
