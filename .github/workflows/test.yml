@@ -1,0 +1,67 @@
+name: test
+
+on:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      # Tests use H2 in-memory (application-test.yml) — no Postgres service needed
+      - name: Run tests
+        run: ./gradlew test --no-daemon
+
+      - name: Generate Jacoco report
+        run: ./gradlew jacocoTestReport --no-daemon
+
+      - name: Check Jacoco report exists
+        id: check-jacoco
+        run: |
+          REPORT_PATH="build/reports/jacoco/test/jacocoTestReport.xml"
+          if [ -f "$REPORT_PATH" ]; then
+            echo "report_exists=true" >> $GITHUB_OUTPUT
+            echo "report_path=$REPORT_PATH" >> $GITHUB_OUTPUT
+          else
+            echo "report_exists=false" >> $GITHUB_OUTPUT
+            echo "::warning::Jacoco report not found at $REPORT_PATH"
+          fi
+
+      - name: Upload coverage artifact
+        if: steps.check-jacoco.outputs.report_exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/reports/jacoco/test/
+          retention-days: 3
+
+      - name: Publish coverage comment on PR
+        if: steps.check-jacoco.outputs.report_exists == 'true' && github.event_name == 'pull_request'
+        uses: madrapps/jacoco-report@v1.7.2
+        with:
+          paths: ${{ steps.check-jacoco.outputs.report_path }}
+          token: ${{ github.token }}
+          comment-type: both
+          update-comment: true
+          min-coverage-overall: 28
+          min-coverage-changed-files: 50
+          title: 'Code Coverage'
+          pass-emoji: '✅'
+          fail-emoji: '❌'
+
+      - name: Upload test results (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/reports/tests/test/
+          retention-days: 3

@@ -1,0 +1,93 @@
+name: on-merge-main
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+  packages: write  # needed to push to ghcr.io
+
+jobs:
+  # ── 1. Tests ────────────────────────────────────────────────────────────────
+  test:
+    uses: ./.github/workflows/test.yml
+
+  # ── 2. Build & push Docker image to ghcr.io ─────────────────────────────────
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 3. Deploy to VPS via SSH ──────────────────────────────────────────────
+  # To enable: add these secrets in Settings → Secrets:
+  #   VPS_HOST       — IP or hostname of your server
+  #   VPS_USER       — SSH user (e.g. ubuntu, deploy)
+  #   VPS_SSH_KEY    — private key (content of ~/.ssh/id_ed25519)
+  #   VPS_PORT       — SSH port (default 22)
+  # The VPS must have Docker installed and a .env file at ~/koalla-core/.env
+  # with all required env vars (DATABASE_URL, OPENAI_API_KEY, etc.)
+  deploy:
+    needs: docker
+    runs-on: ubuntu-latest
+    environment: production  # optional: adds a manual approval gate in GitHub UI
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}  # set DEPLOY_ENABLED=true in repo Variables to activate
+
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            IMAGE="ghcr.io/${{ github.repository }}:latest"
+            COMPOSE_FILE="$HOME/koalla-core/docker-compose.yml"
+
+            echo "Pulling $IMAGE..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull "$IMAGE"
+
+            echo "Restarting service..."
+            cd "$HOME/koalla-core"
+            docker compose up -d --no-build api
+
+            echo "Cleaning up old images..."
+            docker image prune -f
+
+            echo "✅ Deploy done — $(date)"
