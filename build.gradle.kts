@@ -4,7 +4,9 @@ plugins {
 	kotlin("plugin.jpa") version "2.3.21"
 	id("org.springframework.boot") version "4.1.0"
 	id("io.spring.dependency-management") version "1.1.7"
-	id("io.gitlab.arturbosch.detekt") version "1.23.8"
+	// TODO: Re-enable when detekt supports Kotlin 2.3.x
+	// detekt 1.23.8 was compiled with Kotlin 2.0.21 and is incompatible with Kotlin 2.3.21
+	// id("io.gitlab.arturbosch.detekt") version "1.23.8"
 	jacoco
 }
 
@@ -58,6 +60,7 @@ dependencies {
 	// Observability — Micrometer + Prometheus
 	runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
+
 	// Test
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-security-test")
@@ -82,13 +85,23 @@ kotlin {
 }
 
 // ── Detekt ────────────────────────────────────────────────────────────────────
-
+// TODO: Re-enable when detekt supports Kotlin 2.3.x
+// detekt 1.23.8 was compiled with Kotlin 2.0.21 and is incompatible with Kotlin 2.3.21
+/*
 detekt {
 	buildUponDefaultConfig = true
 	allRules = false
 	config.setFrom(files("$rootDir/detekt.yml"))
 	autoCorrect = true
 }
+
+// Disable type resolution to avoid Kotlin version mismatch with detekt 1.23.8
+// Type resolution requires the same Kotlin compiler version that detekt was built with
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+	// Clear classpath to disable type resolution
+	classpath.setFrom()
+}
+*/
 
 // ── Jacoco ────────────────────────────────────────────────────────────────────
 
