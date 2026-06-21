@@ -22,6 +22,10 @@ from app.database import get_db
 from app.services import billing_service
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select
+
+from app.models.user import User
+
 router = APIRouter()
 settings = get_settings()
 
@@ -97,3 +101,38 @@ async def asaas_webhook(
         await billing_service.mark_event_processed(db, event_id, event)
 
     return {"status": "ok", "event": event}
+
+@router.post("/cancel-subscription/{wa_id}")
+async def cancel_subscription(
+    wa_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Cancela a assinatura do usuário.
+    """
+
+    result = await db.execute(
+        select(User).where(User.wa_id == wa_id)
+    )
+
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    try:
+        result = await billing_service.cancel_user_subscription(
+            db=db,
+            user=user,
+        )
+
+        return result
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc)
+        )

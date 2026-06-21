@@ -10,7 +10,7 @@ Grace period:
   O job `expire_grace_periods` roda a cada hora verificando assinaturas expiradas.
 """
 import logging
-import uuid
+
 from datetime import date, timedelta, datetime, timezone
 
 from sqlalchemy import select
@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 GRACE_HOURS: int = settings.GRACE_HOURS  # configurável via .env (padrão 48h)
-
 
 async def start_trial(
     db: AsyncSession,
@@ -103,7 +102,6 @@ async def start_trial(
         "plan": plan,
     }
 
-
 async def handle_payment_confirmed(db: AsyncSession, payment_id: str, subscription_id: str | None) -> None:
     """
     Webhook PAYMENT_CONFIRMED / PAYMENT_RECEIVED:
@@ -145,7 +143,6 @@ async def handle_payment_confirmed(db: AsyncSession, payment_id: str, subscripti
         user.is_active = True
 
     await db.commit()
-
 
 async def handle_payment_overdue(db: AsyncSession, payment_id: str, subscription_id: str | None) -> None:
     """
@@ -195,7 +192,6 @@ async def handle_payment_overdue(db: AsyncSession, payment_id: str, subscription
 
     await db.commit()
 
-
 async def _notify_payment_overdue(wa_id: str, grace_hours: int) -> None:
     """Envia mensagem de pagamento atrasado via WhatsApp."""
     message = (
@@ -208,7 +204,6 @@ async def _notify_payment_overdue(wa_id: str, grace_hours: int) -> None:
         await chatwoot_client.send_message_to_phone(wa_id, message)
     except Exception as exc:
         logger.warning("Falha ao notificar usuário %s sobre pagamento atrasado: %s", wa_id, exc)
-
 
 async def expire_grace_periods(db: AsyncSession) -> int:
     """
@@ -243,7 +238,6 @@ async def expire_grace_periods(db: AsyncSession) -> int:
 
     return deactivated
 
-
 async def _notify_access_revoked(wa_id: str) -> None:
     """Notifica o usuário que o acesso foi suspenso."""
     message = (
@@ -256,7 +250,6 @@ async def _notify_access_revoked(wa_id: str) -> None:
         await chatwoot_client.send_message_to_phone(wa_id, message)
     except Exception as exc:
         logger.warning("Falha ao notificar usuário %s sobre suspensão: %s", wa_id, exc)
-
 
 async def handle_subscription_deleted(db: AsyncSession, subscription_id: str) -> None:
     """
@@ -280,7 +273,6 @@ async def handle_subscription_deleted(db: AsyncSession, subscription_id: str) ->
 
     await db.commit()
 
-
 # ── Idempotência ───────────────────────────────────────────────────────────
 
 async def is_event_already_processed(db: AsyncSession, event_id: str) -> bool:
@@ -293,7 +285,6 @@ async def is_event_already_processed(db: AsyncSession, event_id: str) -> bool:
     )
     return result.scalars().first() is not None
 
-
 async def mark_event_processed(db: AsyncSession, event_id: str, event_type: str) -> None:
     """
     Registra o event_id como processado.
@@ -301,3 +292,56 @@ async def mark_event_processed(db: AsyncSession, event_id: str, event_type: str)
     """
     db.add(WebhookEvent(event_id=event_id, event_type=event_type))
     await db.commit()
+
+async def cancel_user_subscription(
+    db: AsyncSession,
+    user: User,
+) -> dict:
+    """
+    Cancela a assinatura ativa do usuário.
+
+    Fluxo:
+    1. Busca assinatura ativa
+    2. Cancela no Asaas
+    3. Marca como CANCELADA localmente
+    4. Desativa usuário
+    """
+
+    result = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == user.id,
+            Subscription.status.in_([
+                SubStatus.ACTIVE,
+                SubStatus.TRIALING,
+                SubStatus.PAST_DUE,
+            ])
+        )
+    )
+
+    subscription = result.scalars().first()
+
+    if not subscription:
+        raise ValueError("Usuário não possui assinatura ativa")
+
+    await asaas_client.cancel_subscription(
+        subscription.asaas_subscription_id
+    )
+
+    subscription.status = SubStatus.CANCELED
+
+    user.is_active = False
+
+    logger.info(
+        "Assinatura cancelada. user=%s subscription=%s",
+        user.wa_id,
+        subscription.asaas_subscription_id,
+    )
+
+    await db.commit()
+
+    return {
+        "success": True,
+        "subscription_id": subscription.asaas_subscription_id,
+    }
+
+
