@@ -11,8 +11,8 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import ai.koalla.core.util.secureCompare
 import jakarta.servlet.http.HttpServletRequest
-import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -88,23 +88,10 @@ class WebhookController(
         // BACKGROUND PROCESSING
         // =====================================================================
 
-        // Process in background using coroutines
-        runBlocking {
-            messagePipelineService.processWebhook(body)
-        }
+        // Launch in background — returns immediately
+        messagePipelineService.processWebhook(body)
 
         return ResponseEntity.ok(WebhookResponse(status = "queued"))
     }
 
-    /**
-     * Constant-time string comparison to prevent timing attacks.
-     */
-    private fun secureCompare(a: String, b: String): Boolean {
-        if (a.length != b.length) return false
-        var result = 0
-        for (i in a.indices) {
-            result = result or (a[i].code xor b[i].code)
-        }
-        return result == 0
-    }
 }

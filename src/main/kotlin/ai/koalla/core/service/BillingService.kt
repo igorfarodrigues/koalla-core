@@ -125,7 +125,7 @@ class BillingService(
                 userId = subscription.userId,
                 subscriptionId = subscription.id,
                 asaasPaymentId = paymentId,
-                amount = props.plans.getValue(subscription.planName ?: ""),
+                amount = props.plans.getValue(subscription.planName ?: "STARTER"),
                 status = "CONFIRMED"
             )
         } else {
@@ -182,7 +182,7 @@ class BillingService(
                 userId = subscription.userId,
                 subscriptionId = subscription.id,
                 asaasPaymentId = paymentId,
-                amount = props.plans.getValue(subscription.planName ?: ""),
+                amount = props.plans.getValue(subscription.planName ?: "STARTER"),
                 status = "OVERDUE"
             )
         }

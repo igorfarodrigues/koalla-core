@@ -2,6 +2,7 @@ package ai.koalla.core.controller
 
 import ai.koalla.core.config.KoallaProperties
 import ai.koalla.core.dto.AsaasWebhookPayload
+import ai.koalla.core.util.secureCompare
 import ai.koalla.core.dto.CancelSubscriptionResponse
 import ai.koalla.core.repository.UserRepository
 import ai.koalla.core.service.BillingService
@@ -108,18 +109,26 @@ class BillingWebhookController(
     @PostMapping("/cancel-subscription/{waId}")
     @Operation(
         summary = "Cancelar assinatura",
-        description = "Cancela a assinatura de um usuário no Asaas e desativa a conta"
+        description = "Cancela a assinatura de um usuário no Asaas e desativa a conta. Requer X-Koalla-Secret."
     )
     @ApiResponses(value = [
         ApiResponse(responseCode = "200", description = "Assinatura cancelada",
             content = [Content(schema = Schema(implementation = CancelSubscriptionResponse::class))]),
+        ApiResponse(responseCode = "401", description = "Secret inválido ou ausente"),
         ApiResponse(responseCode = "404", description = "Usuário não encontrado"),
         ApiResponse(responseCode = "400", description = "Erro ao cancelar")
     ])
     fun cancelSubscription(
         @Parameter(description = "Número WhatsApp do usuário")
-        @PathVariable waId: String
+        @PathVariable waId: String,
+        @Parameter(description = "Secret de autenticação")
+        @RequestHeader("X-Koalla-Secret", required = false) secret: String?
     ): ResponseEntity<Any> {
+        if (!secureCompare(secret ?: "", props.chatwoot.webhookSecret)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(mapOf("error" to "Unauthorized"))
+        }
+
         val user = userRepository.findByWaId(waId)
             ?: return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(mapOf("error" to "User not found"))
@@ -138,12 +147,4 @@ class BillingWebhookController(
         }
     }
 
-    private fun secureCompare(a: String, b: String): Boolean {
-        if (a.length != b.length) return false
-        var result = 0
-        for (i in a.indices) {
-            result = result or (a[i].code xor b[i].code)
-        }
-        return result == 0
-    }
 }

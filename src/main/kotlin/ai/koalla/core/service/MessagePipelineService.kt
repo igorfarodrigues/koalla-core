@@ -7,9 +7,10 @@ import ai.koalla.core.dto.ChatwootWebhookBody
 import ai.koalla.core.entity.ConversationStatus
 import ai.koalla.core.entity.MessageQueue
 import ai.koalla.core.repository.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.OffsetDateTime
@@ -28,7 +29,8 @@ class MessagePipelineService(
     private val chatwootClient: ChatwootClient,
     private val koallaAgent: KoallaAgent,
     private val audioService: AudioService,
-    private val props: KoallaProperties
+    private val props: KoallaProperties,
+    private val applicationScope: CoroutineScope
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -39,14 +41,17 @@ class MessagePipelineService(
 
     /**
      * Entry point called by the webhook controller.
-     * Mirrors the full n8n flow end-to-end.
+     * Launches processing in the application CoroutineScope so the HTTP
+     * response returns immediately (non-blocking) while the pipeline runs
+     * in the background. SupervisorJob ensures one failure doesn't cancel others.
      */
-    @Async
-    suspend fun processWebhook(body: ChatwootWebhookBody) {
-        try {
-            doProcessWebhook(body)
-        } catch (e: Exception) {
-            logger.error("Error processing webhook: ${e.message}", e)
+    fun processWebhook(body: ChatwootWebhookBody) {
+        applicationScope.launch {
+            try {
+                doProcessWebhook(body)
+            } catch (e: Exception) {
+                logger.error("Error processing webhook: ${e.message}", e)
+            }
         }
     }
 
@@ -159,18 +164,14 @@ class MessagePipelineService(
         }
 
         // ── 9. Conversation lock: wait if agent is already responding ─────────
-        repeat(5) {
-            val status = getStatus(sessionId)
-            if (status == null || !status.lockConversa) {
-                return@repeat
-            }
+        var lockAttempts = 0
+        while (lockAttempts < 5 && getStatus(sessionId)?.lockConversa == true) {
             delay((props.messageQueueWaitSeconds * 10 * 1000).toLong())
+            lockAttempts++
         }
 
-        // Check one more time
-        val finalStatus = getStatus(sessionId)
-        if (finalStatus?.lockConversa == true) {
-            // Gave up waiting
+        if (getStatus(sessionId)?.lockConversa == true) {
+            // Gave up waiting after 5 attempts
             return
         }
 

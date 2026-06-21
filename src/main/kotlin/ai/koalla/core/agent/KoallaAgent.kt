@@ -6,14 +6,16 @@ import ai.koalla.core.service.AgentContext
 import ai.koalla.core.tools.ToolContextHolder
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.Message
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
 import org.springframework.ai.chat.model.ChatModel
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
+
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
@@ -31,8 +33,7 @@ class KoallaAgent(
     private val toolContextHolder: ToolContextHolder,
     private val props: KoallaProperties,
     private val objectMapper: ObjectMapper,
-    private val chatClientBuilder: ChatClient.Builder,
-    @Value("\${spring.ai.openai.api-key}") private val openaiApiKey: String
+    private val chatClientBuilder: ChatClient.Builder
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -115,61 +116,65 @@ SUA SAÍDA DEVE SER SOMENTE A MENSAGEM FORMATADA.
     /**
      * Run the Koalla agent for a given message and session.
      * Uses Spring AI function calling for tool execution.
-     * Returns the agent's text output.
+     *
+     * The entire LLM call runs inside withContext(Dispatchers.IO) to ensure
+     * thread affinity: Spring AI's Function callbacks (tools) are synchronous
+     * and rely on ThreadLocal context. Pinning to an IO thread guarantees the
+     * ThreadLocal set before the call is visible inside every tool invocation.
      */
     suspend fun runAgent(message: String, sessionId: String, context: AgentContext): String? {
-        // Set context for tools to access
-        toolContextHolder.set(context)
-        try {
-            // Load conversation history from database
-            val historyRecords = chatHistoryRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)
-                .takeLast(props.memoryWindowLength)
+        // Load history before entering IO context (avoids nested dispatchers)
+        val historyRecords = chatHistoryRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)
+            .takeLast(props.memoryWindowLength)
 
-            val chatHistory = historyRecords.mapNotNull { record ->
-                try {
-                    @Suppress("UNCHECKED_CAST")
-                    val msgData = objectMapper.readValue(record.message, Map::class.java) as Map<String, Any>
-                    val role = msgData["role"] as? String
-                    val content = msgData["content"] as? String ?: ""
-                    when (role) {
-                        "user" -> UserMessage(content)
-                        "assistant" -> AssistantMessage(content)
-                        else -> null
-                    }
-                } catch (e: Exception) {
-                    null
+        val chatHistory = historyRecords.mapNotNull { record ->
+            try {
+                @Suppress("UNCHECKED_CAST")
+                val msgData = objectMapper.readValue(record.message, Map::class.java) as Map<String, Any>
+                val role = msgData["role"] as? String
+                val content = msgData["content"] as? String ?: ""
+                when (role) {
+                    "user" -> UserMessage(content)
+                    "assistant" -> AssistantMessage(content)
+                    else -> null
                 }
+            } catch (e: Exception) {
+                null
             }
+        }
 
-            // Build messages
-            val systemPrompt = SYSTEM_PROMPT.replace(
-                "{current_date}",
-                OffsetDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-            )
+        val systemPrompt = SYSTEM_PROMPT.replace(
+            "{current_date}",
+            OffsetDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        )
 
-            val messages = mutableListOf<Message>()
-            messages.add(SystemMessage(systemPrompt))
-            messages.addAll(chatHistory)
-            messages.add(UserMessage(message))
+        val messages = mutableListOf<Message>()
+        messages.add(SystemMessage(systemPrompt))
+        messages.addAll(chatHistory)
+        messages.add(UserMessage(message))
 
-            // Call the model - functions are auto-registered via Spring AI
-            val response = chatClient.prompt()
-                .messages(messages)
-                .call()
-                .content()
+        // Pin to IO thread: toolContextHolder (ThreadLocal) and chatClient.call()
+        // (blocking) both require stable thread affinity for correct behavior.
+        return withContext(Dispatchers.IO) {
+            toolContextHolder.set(context)
+            try {
+                val response = chatClient.prompt()
+                    .messages(messages)
+                    .call()
+                    .content()
 
-            // Save to history
-            saveToHistory(sessionId, "user", message)
-            if (response != null) {
-                saveToHistory(sessionId, "assistant", response)
+                saveToHistory(sessionId, "user", message)
+                if (response != null) {
+                    saveToHistory(sessionId, "assistant", response)
+                }
+
+                response
+            } catch (e: Exception) {
+                logger.error("Agent execution failed: ${e.message}", e)
+                throw e
+            } finally {
+                toolContextHolder.clear()
             }
-
-            return response
-        } catch (e: Exception) {
-            logger.error("Agent execution failed: ${e.message}", e)
-            throw e
-        } finally {
-            toolContextHolder.clear()
         }
     }
 
@@ -192,31 +197,31 @@ SUA SAÍDA DEVE SER SOMENTE A MENSAGEM FORMATADA.
 
     /**
      * Format agent output for WhatsApp using LLM.
-     * Ensures proper formatting for WhatsApp markdown.
+     * Reuses the shared chatClient (lazy) instead of creating a new instance per call.
+     * Falls back to regex if the LLM call fails.
      */
     suspend fun formatForWhatsApp(text: String): String {
-        // Quick check - if text is already well-formatted, skip LLM call
+        // Quick check — if already well-formatted, skip LLM call
         if (!text.contains("**") && !text.contains("#")) {
             return text.trim()
         }
 
-        return try {
-            val formattingClient = ChatClient.create(chatModel)
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = chatClient.prompt()
+                    .system(FORMATTING_PROMPT)
+                    .user(text)
+                    .call()
+                    .content()
 
-            val response = formattingClient.prompt()
-                .system(FORMATTING_PROMPT)
-                .user(text)
-                .call()
-                .content()
-
-            response?.trim() ?: text.trim()
-        } catch (e: Exception) {
-            logger.warn("Formatting failed, using fallback: ${e.message}")
-            // Fallback to simple regex formatting
-            text
-                .replace("**", "*")
-                .replace(Regex("#+\\s*"), "")
-                .trim()
+                response?.trim() ?: text.trim()
+            } catch (e: Exception) {
+                logger.warn("Formatting failed, using fallback: ${e.message}")
+                text
+                    .replace("**", "*")
+                    .replace(Regex("#+\\s*"), "")
+                    .trim()
+            }
         }
     }
 }

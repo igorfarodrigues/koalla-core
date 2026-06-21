@@ -135,8 +135,12 @@ class FunctionCallbacksConfig(
 
         val transactions = transactionRepository.findByUserIdAndPeriod(ctx.userId, start, end)
 
+        // Single query for all categories, reused for both filtering and display
+        val allCategories = categoryRepository.findByUserIdIsNull()
+        val categoryMap = allCategories.associateBy { it.id }
+
         val filtered = if (req.category != null) {
-            val categoryIds = categoryRepository.findByUserIdIsNull()
+            val categoryIds = allCategories
                 .filter { it.name.equals(req.category, ignoreCase = true) }
                 .mapNotNull { it.id }
             transactions.filter { it.categoryId in categoryIds }
@@ -148,15 +152,17 @@ class FunctionCallbacksConfig(
             return@Function "Nenhuma transação encontrada nesse período."
         }
 
-        val categoryMap = categoryRepository.findByUserIdIsNull().associateBy { it.id }
-
+        // Calculate totals over ALL filtered transactions, not just the displayed 20
         var totalIn = 0L
         var totalOut = 0L
+        for (tx in filtered) {
+            if (tx.movement == MovementType.CASH_IN) totalIn += tx.amount else totalOut += tx.amount
+        }
+
         val lines = filtered.take(20).map { tx ->
             val catName = categoryMap[tx.categoryId]?.name ?: "Sem categoria"
             val symbol = if (tx.movement == MovementType.CASH_IN) "+" else "-"
             val amountBrl = tx.amount / 100.0
-            if (tx.movement == MovementType.CASH_IN) totalIn += tx.amount else totalOut += tx.amount
             "${symbol}R$${"%.2f".format(amountBrl)} ${tx.description ?: ""} ($catName)"
         }
 

@@ -1,5 +1,8 @@
 package ai.koalla.core.config
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.annotation.EnableAsync
@@ -19,6 +22,16 @@ class AsyncConfig {
         executor.setThreadNamePrefix("koalla-async-")
         executor.initialize()
         return executor
+    }
+
+    /**
+     * Application-scoped CoroutineScope for background processing.
+     * Uses SupervisorJob so one failing coroutine doesn't cancel others.
+     * Bound to the taskExecutor thread pool.
+     */
+    @Bean
+    fun applicationScope(taskExecutor: Executor): CoroutineScope {
+        return CoroutineScope(SupervisorJob() + taskExecutor.asCoroutineDispatcher())
     }
 }
 
