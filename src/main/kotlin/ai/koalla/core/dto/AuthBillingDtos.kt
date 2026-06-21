@@ -85,6 +85,23 @@ data class CancelSubscriptionResponse(
     val subscriptionId: String?
 )
 
+/**
+ * Result of a successful trial signup via BillingService.
+ */
+data class TrialResult(
+    val subscriptionId: String,
+    val trialEndDate: String,
+    val plan: String
+)
+
+/**
+ * Result of a subscription cancellation via BillingService.
+ */
+data class CancelResult(
+    val success: Boolean,
+    val subscriptionId: String?
+)
+
 // ===================== Asaas Webhook DTOs =====================
 
 @JsonIgnoreProperties(ignoreUnknown = true)

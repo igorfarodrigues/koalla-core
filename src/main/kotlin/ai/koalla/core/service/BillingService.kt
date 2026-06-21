@@ -1,6 +1,11 @@
 package ai.koalla.core.service
 
+import ai.koalla.core.config.KoallaProperties
 import ai.koalla.core.domain.User
+import ai.koalla.core.dto.CancelResult
+import ai.koalla.core.dto.CardData
+import ai.koalla.core.dto.CardHolderInfo
+import ai.koalla.core.dto.TrialResult
 import ai.koalla.core.entity.AsaasCustomer
 import ai.koalla.core.entity.Invoice
 import ai.koalla.core.entity.SubStatus
@@ -9,9 +14,6 @@ import ai.koalla.core.exception.SubscriptionNotFoundException
 import ai.koalla.core.exception.UserNotFoundException
 import ai.koalla.core.gateway.AsaasGateway
 import ai.koalla.core.gateway.ChatwootGateway
-import ai.koalla.core.config.KoallaProperties
-import ai.koalla.core.dto.CardData
-import ai.koalla.core.dto.CardHolderInfo
 import ai.koalla.core.repository.*
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -308,13 +310,3 @@ class BillingService(
     }
 }
 
-data class TrialResult(
-    val subscriptionId: String,
-    val trialEndDate: String,
-    val plan: String
-)
-
-data class CancelResult(
-    val success: Boolean,
-    val subscriptionId: String?
-)
