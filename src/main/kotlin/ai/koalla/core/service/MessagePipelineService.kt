@@ -27,6 +27,7 @@ class MessagePipelineService(
     private val chatHistoryRepository: ChatHistoryRepository,
     private val chatwootClient: ChatwootClient,
     private val koallaAgent: KoallaAgent,
+    private val audioService: AudioService,
     private val props: KoallaProperties
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -137,7 +138,7 @@ class MessagePipelineService(
         if (isAudio && attachment?.dataUrl != null) {
             val audioBytes = chatwootClient.downloadAttachment(attachment.dataUrl)
             if (audioBytes != null) {
-                resolvedContent = koallaAgent.transcribeAudio(audioBytes)
+                resolvedContent = audioService.transcribe(audioBytes)
             }
         } else if (resolvedContent.isEmpty() && fileInfo.isNotEmpty()) {
             resolvedContent = fileInfo

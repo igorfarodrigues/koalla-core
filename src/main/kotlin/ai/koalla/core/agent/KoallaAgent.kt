@@ -1,11 +1,9 @@
 package ai.koalla.core.agent
 
-import ai.koalla.core.client.ChatwootClient
 import ai.koalla.core.config.KoallaProperties
-import ai.koalla.core.entity.MovementType
 import ai.koalla.core.repository.ChatHistoryRepository
 import ai.koalla.core.service.AgentContext
-import ai.koalla.core.service.TransactionService
+import ai.koalla.core.tools.ToolContextHolder
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.ai.chat.client.ChatClient
@@ -13,34 +11,38 @@ import org.springframework.ai.chat.messages.AssistantMessage
 import org.springframework.ai.chat.messages.Message
 import org.springframework.ai.chat.messages.SystemMessage
 import org.springframework.ai.chat.messages.UserMessage
-import org.springframework.ai.openai.OpenAiChatModel
+import org.springframework.ai.chat.model.ChatModel
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /**
  * Koalla — the intelligent financial assistant via WhatsApp.
- * Implemented with Spring AI and OpenAI.
+ * Implemented with Spring AI and OpenAI function calling.
+ *
+ * Function calling is configured via @Bean functions with @Description in FunctionCallbacksConfig.
+ * Spring AI auto-discovers these functions and makes them available to the ChatClient.
  */
 @Component
 class KoallaAgent(
-    private val chatModel: OpenAiChatModel,
+    private val chatModel: ChatModel,
     private val chatHistoryRepository: ChatHistoryRepository,
-    private val transactionService: TransactionService,
-    private val chatwootClient: ChatwootClient,
+    private val toolContextHolder: ToolContextHolder,
     private val props: KoallaProperties,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val chatClientBuilder: ChatClient.Builder,
+    @Value("\${spring.ai.openai.api-key}") private val openaiApiKey: String
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     companion object {
         private val SYSTEM_PROMPT = """
 # PAPEL
-Você é o Koalla.ai, assistente financeiro inteligente que ajuda o usuário a registrar, 
-organizar e entender sua vida financeira através do WhatsApp. Seu papel é fazer a gestão 
-financeira ativa e automática: registrar gastos e receitas, categorizar transações, 
-acompanhar histórico financeiro e fornecer clareza sobre para onde o dinheiro está indo 
+Você é o Koalla.ai, assistente financeiro inteligente que ajuda o usuário a registrar,
+organizar e entender sua vida financeira através do WhatsApp. Seu papel é fazer a gestão
+financeira ativa e automática: registrar gastos e receitas, categorizar transações,
+acompanhar histórico financeiro e fornecer clareza sobre para onde o dinheiro está indo
 — com o mínimo de fricção possível.
 
 # PRINCÍPIO FUNDAMENTAL
@@ -56,19 +58,19 @@ Seu objetivo é:
 * Moeda padrão: BRL (R$)
 
 # REGRAS DE INFERÊNCIA (AUTOMAÇÃO OBRIGATÓRIA)
-Ao receber qualquer mensagem curta contendo valor monetário, Koalla DEVE assumir que se 
+Ao receber qualquer mensagem curta contendo valor monetário, Koalla DEVE assumir que se
 trata de um registro financeiro.
 
 ### Categorias disponíveis:
-Mercado, Diversao, Educação, Assinatura, Transporte, Alimentacao, Moradia, Lazer, 
-Saude, Investimento, Outros, Receita
+Mercado, Diversão, Educação, Assinatura, Transporte, Alimentação, Moradia, Lazer,
+Saúde, Investimento, Outros, Receita
 
 ### Inferência de tipo:
 * Padrão: CASH_OUT (despesa)
 * Só usar CASH_IN se houver: recebi, salário, pix recebido, entrou, freela
 
 # COMPORTAMENTO PADRÃO (EXEMPLOS)
-* "Almoço 45" → registrar: Almoço, R${'$'}45, Alimentacao, hoje, CASH_OUT → "✅ Almoço R${'$'}45 em Alimentação."
+* "Almoço 45" → registrar: Almoço, R${'$'}45, Alimentação, hoje, CASH_OUT → "✅ Almoço R${'$'}45 em Alimentação."
 * "Recebi 500 do freela ontem" → registrar: Freela, R${'$'}500, Receita, ontem, CASH_IN → "💰 Receita R${'$'}500 registrada para ontem."
 * "Uber 34" → registrar → "🚗 Uber R${'$'}34 em Transporte."
 
@@ -82,24 +84,42 @@ Saude, Investimento, Outros, Receita
 Só perguntar se faltar informação CRÍTICA (valor não identificado ou mensagem ambígua).
 
 # FERRAMENTAS DISPONÍVEIS
-- register_transaction: registra receita ou despesa
-- list_transactions: lista transações por período
-- monthly_summary: resumo mensal por categoria
+- registerTransaction: registra receita ou despesa
+- listTransactions: lista transações por período
+- monthlySummary: resumo mensal por categoria
+- sendText: envia texto separado (use para links, PIX, etc.)
+- reactToMessage: reação emoji (máx 3/conversa)
+- setResponsePreference: salva preferência audio/texto
+- sendCancellationAlert: alerta de cancelamento ao gestor
+- escalateToHuman: escalar para atendimento humano
 
 # REGRA DE OURO
 Se deu para inferir, EXECUTE. Se não deu, pergunte UMA vez.
         """.trimIndent()
+
+        private val FORMATTING_PROMPT = """
+Você é especialista em formatação de mensagem para WhatsApp, trabalhando somente na formatação e não alterando o conteúdo da mensagem.
+- Substitua ** por *
+- Remova #
+- Remova emojis duplicados ou excessivos
+
+SUA SAÍDA DEVE SER SOMENTE A MENSAGEM FORMATADA.
+        """.trimIndent()
     }
 
-    // Thread-local context for tools
-    private val contextHolder = ThreadLocal<AgentContext>()
+    // ChatClient with functions auto-configured via Spring AI
+    private val chatClient: ChatClient by lazy {
+        chatClientBuilder.build()
+    }
 
     /**
      * Run the Koalla agent for a given message and session.
+     * Uses Spring AI function calling for tool execution.
      * Returns the agent's text output.
      */
     suspend fun runAgent(message: String, sessionId: String, context: AgentContext): String? {
-        contextHolder.set(context)
+        // Set context for tools to access
+        toolContextHolder.set(context)
         try {
             // Load conversation history from database
             val historyRecords = chatHistoryRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)
@@ -107,10 +127,13 @@ Se deu para inferir, EXECUTE. Se não deu, pergunte UMA vez.
 
             val chatHistory = historyRecords.mapNotNull { record ->
                 try {
-                    val msgData = objectMapper.readValue(record.message, Map::class.java)
-                    when (msgData["role"]) {
-                        "user" -> UserMessage(msgData["content"] as? String ?: "")
-                        "assistant" -> AssistantMessage(msgData["content"] as? String ?: "")
+                    @Suppress("UNCHECKED_CAST")
+                    val msgData = objectMapper.readValue(record.message, Map::class.java) as Map<String, Any>
+                    val role = msgData["role"] as? String
+                    val content = msgData["content"] as? String ?: ""
+                    when (role) {
+                        "user" -> UserMessage(content)
+                        "assistant" -> AssistantMessage(content)
                         else -> null
                     }
                 } catch (e: Exception) {
@@ -129,11 +152,7 @@ Se deu para inferir, EXECUTE. Se não deu, pergunte UMA vez.
             messages.addAll(chatHistory)
             messages.add(UserMessage(message))
 
-            // Call the model
-            val chatClient = ChatClient.create(chatModel)
-
-            // For now, we'll use a simpler approach without function calling
-            // and handle tool logic in the response parsing
+            // Call the model - functions are auto-registered via Spring AI
             val response = chatClient.prompt()
                 .messages(messages)
                 .call()
@@ -145,82 +164,12 @@ Se deu para inferir, EXECUTE. Se não deu, pergunte UMA vez.
                 saveToHistory(sessionId, "assistant", response)
             }
 
-            // Check if response indicates a transaction registration
-            val processedResponse = processAgentResponse(response ?: "", message, context)
-
-            return processedResponse
+            return response
+        } catch (e: Exception) {
+            logger.error("Agent execution failed: ${e.message}", e)
+            throw e
         } finally {
-            contextHolder.remove()
-        }
-    }
-
-    /**
-     * Process agent response and handle implicit tool calls.
-     * This is a simplified version - in production, you'd use proper function calling.
-     */
-    private fun processAgentResponse(response: String, originalMessage: String, context: AgentContext): String {
-        // Simple heuristic: if the message contains a number and looks like a transaction
-        val amountRegex = Regex("""(\d+[.,]?\d*)\s*(reais|R\$)?""", RegexOption.IGNORE_CASE)
-        val match = amountRegex.find(originalMessage)
-
-        if (match != null && (response.contains("✅") || response.contains("💰") || response.contains("🚗"))) {
-            // Transaction was likely registered by the model's response
-            // In a full implementation, we'd parse structured output and call the service
-            try {
-                val amountStr = match.groupValues[1].replace(",", ".")
-                val amount = (amountStr.toDouble() * 100).toLong()
-
-                val movement = if (originalMessage.lowercase().contains(Regex("recebi|salário|pix recebido|entrou|freela"))) {
-                    MovementType.CASH_IN
-                } else {
-                    MovementType.CASH_OUT
-                }
-
-                val category = inferCategory(originalMessage)
-                val description = originalMessage.replace(Regex("""\d+[.,]?\d*"""), "").trim()
-                    .take(100)
-                    .ifEmpty { category }
-
-                transactionService.registerTransaction(
-                    userId = context.userId,
-                    description = description,
-                    amount = amount,
-                    movement = movement,
-                    categoryName = category,
-                    occurredAt = inferDate(originalMessage)
-                )
-            } catch (e: Exception) {
-                logger.debug("Could not auto-register transaction: ${e.message}")
-            }
-        }
-
-        return response
-    }
-
-    private fun inferCategory(message: String): String {
-        val lower = message.lowercase()
-        return when {
-            lower.contains("uber") || lower.contains("taxi") || lower.contains("99") || lower.contains("transporte") -> "Transporte"
-            lower.contains("almoço") || lower.contains("janta") || lower.contains("lanche") || lower.contains("comida") -> "Alimentacao"
-            lower.contains("mercado") || lower.contains("supermercado") || lower.contains("feira") -> "Mercado"
-            lower.contains("netflix") || lower.contains("spotify") || lower.contains("assinatura") -> "Assinatura"
-            lower.contains("cinema") || lower.contains("show") || lower.contains("diversão") || lower.contains("bar") -> "Diversao"
-            lower.contains("escola") || lower.contains("curso") || lower.contains("livro") -> "Educação"
-            lower.contains("aluguel") || lower.contains("condomínio") || lower.contains("luz") || lower.contains("água") -> "Moradia"
-            lower.contains("médico") || lower.contains("farmácia") || lower.contains("remédio") || lower.contains("saúde") -> "Saude"
-            lower.contains("investimento") || lower.contains("ação") || lower.contains("fundo") -> "Investimento"
-            lower.contains("recebi") || lower.contains("salário") || lower.contains("freela") || lower.contains("pix recebido") -> "Receita"
-            else -> "Outros"
-        }
-    }
-
-    private fun inferDate(message: String): OffsetDateTime {
-        val lower = message.lowercase()
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
-        return when {
-            lower.contains("ontem") -> now.minusDays(1)
-            lower.contains("anteontem") -> now.minusDays(2)
-            else -> now
+            toolContextHolder.clear()
         }
     }
 
@@ -242,25 +191,32 @@ Se deu para inferir, EXECUTE. Se não deu, pergunte UMA vez.
     }
 
     /**
-     * Transcribe audio using OpenAI Whisper API.
-     */
-    suspend fun transcribeAudio(audioBytes: ByteArray): String {
-        // For now, return a placeholder - full implementation would use OpenAI Whisper API
-        logger.info("Audio transcription requested (${audioBytes.size} bytes)")
-        return "[Áudio recebido - transcrição não implementada]"
-    }
-
-    /**
-     * Format agent output for WhatsApp:
-     * - Replace ** with *
-     * - Remove #
-     * - Clean up formatting
+     * Format agent output for WhatsApp using LLM.
+     * Ensures proper formatting for WhatsApp markdown.
      */
     suspend fun formatForWhatsApp(text: String): String {
-        return text
-            .replace("**", "*")
-            .replace(Regex("#+\\s*"), "")
-            .trim()
+        // Quick check - if text is already well-formatted, skip LLM call
+        if (!text.contains("**") && !text.contains("#")) {
+            return text.trim()
+        }
+
+        return try {
+            val formattingClient = ChatClient.create(chatModel)
+
+            val response = formattingClient.prompt()
+                .system(FORMATTING_PROMPT)
+                .user(text)
+                .call()
+                .content()
+
+            response?.trim() ?: text.trim()
+        } catch (e: Exception) {
+            logger.warn("Formatting failed, using fallback: ${e.message}")
+            // Fallback to simple regex formatting
+            text
+                .replace("**", "*")
+                .replace(Regex("#+\\s*"), "")
+                .trim()
+        }
     }
 }
-
