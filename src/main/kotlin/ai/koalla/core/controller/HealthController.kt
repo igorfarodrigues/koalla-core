@@ -1,0 +1,19 @@
+package ai.koalla.core.controller
+
+import ai.koalla.core.config.KoallaProperties
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RestController
+
+@RestController
+class HealthController(
+    private val props: KoallaProperties
+) {
+    @GetMapping("/health")
+    fun health(): Map<String, String> {
+        return mapOf(
+            "status" to "ok",
+            "version" to props.version
+        )
+    }
+}
+

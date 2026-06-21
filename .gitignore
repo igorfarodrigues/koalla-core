@@ -30,6 +30,7 @@ env/
 .idea/
 *.swp
 *.swo
+*.iml
 
 # Docker
 .docker/
@@ -40,3 +41,16 @@ Thumbs.db
 
 # Alembic
 alembic/versions/*.pyc
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Kotlin
+*.class
+out/
+
+# Spring Boot
+HELP.md
+

@@ -1,0 +1,104 @@
+spring:
+  application:
+    name: koalla-core
+
+  # Database
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/koalla}
+    username: ${DB_USERNAME:koalla}
+    password: ${DB_PASSWORD:koalla}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: koalla
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    open-in-view: false
+
+  # Spring AI - OpenAI
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: ${OPENAI_MODEL:gpt-4o-mini}
+          temperature: 0.0
+
+  # CORS
+  web:
+    cors:
+      allowed-origins:
+        - https://koalla.ai
+        - https://www.koalla.ai
+      allowed-methods: GET,POST,PATCH,DELETE,OPTIONS
+      allowed-headers: Content-Type,Authorization
+
+# Server
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+# Koalla Custom Configuration
+koalla:
+  version: "0.3.0"
+  db-schema: koalla
+
+  # Chatwoot
+  chatwoot:
+    url: ${CHATWOOT_URL:https://chatwoot.koalla.ai}
+    api-token: ${CHATWOOT_API_TOKEN}
+    account-id: ${CHATWOOT_ACCOUNT_ID:1}
+    webhook-secret: ${CHATWOOT_WEBHOOK_SECRET:}
+
+  # Asaas (Payments)
+  asaas:
+    url: ${ASAAS_URL:https://api-sandbox.asaas.com}
+    api-key: ${ASAAS_API_KEY:}
+    webhook-token: ${ASAAS_WEBHOOK_TOKEN:}
+
+  # Trial & Grace Period
+  trial-days: ${TRIAL_DAYS:15}
+  grace-hours: ${GRACE_HOURS:48}
+
+  # Agent Configuration
+  message-queue-wait-seconds: ${MESSAGE_QUEUE_WAIT_SECONDS:2.0}
+  agent-max-iterations: ${AGENT_MAX_ITERATIONS:10}
+  memory-window-length: ${MEMORY_WINDOW_LENGTH:100}
+
+  # Plans (BRL)
+  plans:
+    starter: ${PLAN_STARTER_VALUE:29.90}
+    pro: ${PLAN_PRO_VALUE:79.90}
+    business: ${PLAN_BUSINESS_VALUE:99.90}
+
+  # Escalation
+  alert-conversation-id: ${ALERT_CONVERSATION_ID:}
+  koalla-wa-number: ${KOALLA_WA_NUMBER:5531936185547}
+
+  # OpenAI formatting model
+  formatting-model: ${OPENAI_FORMATTING_MODEL:gpt-4.1-mini}
+
+# Logging
+logging:
+  level:
+    ai.koalla: DEBUG
+    org.springframework.ai: INFO
+    org.hibernate.SQL: DEBUG
+
