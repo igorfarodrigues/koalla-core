@@ -1,13 +1,12 @@
 plugins {
-	kotlin("jvm") version "2.3.21"
-	kotlin("plugin.spring") version "2.3.21"
-	kotlin("plugin.jpa") version "2.3.21"
+	kotlin("jvm") version "2.0.21"
+	kotlin("plugin.spring") version "2.0.21"
+	kotlin("plugin.jpa") version "2.0.21"
 	id("org.springframework.boot") version "4.1.0"
 	id("io.spring.dependency-management") version "1.1.7"
-	// TODO: Re-enable when detekt supports Kotlin 2.3.x
-	// detekt 1.23.8 was compiled with Kotlin 2.0.21 and is incompatible with Kotlin 2.3.21
-	// id("io.gitlab.arturbosch.detekt") version "1.23.8"
+	id("io.gitlab.arturbosch.detekt") version "1.23.8"
 	jacoco
+	id("com.adarshr.test-logger") version "4.0.0"
 }
 
 group = "ai.koalla"
@@ -22,6 +21,7 @@ java {
 repositories {
 	mavenCentral()
 }
+
 
 extra["springAiVersion"] = "2.0.0"
 
@@ -70,6 +70,7 @@ dependencies {
 	testImplementation("io.mockk:mockk:1.13.13")
 	testImplementation("org.amshove.kluent:kluent:1.73")
 	testImplementation("org.wiremock:wiremock-standalone:3.13.0")
+	testImplementation("org.awaitility:awaitility-kotlin:4.2.1")
 }
 
 dependencyManagement {
@@ -80,14 +81,12 @@ dependencyManagement {
 
 kotlin {
 	compilerOptions {
-		freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
+		freeCompilerArgs.addAll("-Xjsr305=strict")
 	}
 }
 
 // ── Detekt ────────────────────────────────────────────────────────────────────
-// TODO: Re-enable when detekt supports Kotlin 2.3.x
-// detekt 1.23.8 was compiled with Kotlin 2.0.21 and is incompatible with Kotlin 2.3.21
-/*
+
 detekt {
 	buildUponDefaultConfig = true
 	allRules = false
@@ -95,13 +94,9 @@ detekt {
 	autoCorrect = true
 }
 
-// Disable type resolution to avoid Kotlin version mismatch with detekt 1.23.8
-// Type resolution requires the same Kotlin compiler version that detekt was built with
-tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-	// Clear classpath to disable type resolution
-	classpath.setFrom()
+dependencies {
+	detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 }
-*/
 
 // ── Jacoco ────────────────────────────────────────────────────────────────────
 
@@ -123,7 +118,81 @@ tasks.jacocoTestCoverageVerification {
 	}
 }
 
+// ── Test Logger ───────────────────────────────────────────────────────────────
+
+testlogger {
+	theme = com.adarshr.gradle.testlogger.theme.ThemeType.MOCHA
+	showExceptions = true
+	showStackTraces = true
+	showFullStackTraces = false
+	showCauses = true
+	slowThreshold = 2000
+	showSummary = true
+	showSimpleNames = false
+	showPassed = true
+	showSkipped = true
+	showFailed = true
+	showOnlySlow = false
+	showStandardStreams = false
+	showPassedStandardStreams = false
+	showSkippedStandardStreams = false
+	showFailedStandardStreams = true
+	logLevel = LogLevel.LIFECYCLE
+}
+
 tasks.withType<Test> {
 	useJUnitPlatform()
 	finalizedBy(tasks.jacocoTestReport)
+
+	// JVM args for Java module system compatibility
+	jvmArgs(
+		"--add-opens", "java.base/java.time=ALL-UNNAMED",
+		"--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED",
+		"-Dspring.profiles.active=test"
+	)
+
+	testLogging {
+		events("passed", "skipped", "failed")
+		showExceptions = true
+		showCauses = true
+		showStackTraces = true
+		exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+	}
 }
+
+// ── Integration Tests Task ────────────────────────────────────────────────────
+// Integration tests use @Tag("integration") annotation
+// Run with: ./gradlew integrationTest
+// See src/test/kotlin/ai/koalla/core/integration/README.md for setup
+
+tasks.register<Test>("integrationTest") {
+	description = "Runs integration tests tagged with @Tag(\"integration\")."
+	group = "verification"
+
+	useJUnitPlatform {
+		includeTags("integration")
+	}
+
+	mustRunAfter(tasks.test)
+
+	// Dynamic heap settings: smaller for CI runners, larger for local development
+	val isCI = System.getenv("CI") == "true"
+	minHeapSize = if (isCI) "256m" else "512m"
+	maxHeapSize = if (isCI) "1G" else "2G"
+
+	jvmArgs(
+		"--add-opens", "java.base/java.time=ALL-UNNAMED",
+		"--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED",
+		"-Dspring.profiles.active=test",
+		"-XX:+UseG1GC"
+	)
+}
+
+// Exclude integration tests from regular test task
+tasks.test {
+	useJUnitPlatform {
+		excludeTags("integration")
+	}
+}
+
+
