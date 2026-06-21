@@ -3,6 +3,7 @@ package ai.koalla.core.repository
 import ai.koalla.core.entity.*
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -19,18 +20,24 @@ interface SubscriptionRepository : JpaRepository<Subscription, UUID> {
     fun findByAsaasSubscriptionId(asaasSubscriptionId: String): Subscription?
 
     @Query("""
-        SELECT s FROM Subscription s 
-        WHERE s.userId = :userId 
-        AND s.status IN ('ACTIVE', 'TRIALING', 'PAST_DUE')
+        SELECT s FROM Subscription s
+        WHERE s.userId = :userId
+        AND s.status IN (:statuses)
     """)
-    fun findActiveByUserId(userId: UUID): Subscription?
+    fun findActiveByUserId(
+        @Param("userId") userId: UUID,
+        @Param("statuses") statuses: Collection<SubStatus> = listOf(SubStatus.ACTIVE, SubStatus.TRIALING, SubStatus.PAST_DUE)
+    ): Subscription?
 
     @Query("""
-        SELECT s FROM Subscription s 
-        WHERE s.status = 'PAST_DUE' 
+        SELECT s FROM Subscription s
+        WHERE s.status = :status
         AND s.graceExpiresAt <= :now
     """)
-    fun findExpiredGracePeriods(now: OffsetDateTime): List<Subscription>
+    fun findExpiredGracePeriods(
+        @Param("now") now: OffsetDateTime,
+        @Param("status") status: SubStatus = SubStatus.PAST_DUE
+    ): List<Subscription>
 }
 
 @Repository

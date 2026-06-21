@@ -86,6 +86,7 @@ data class CancelSubscriptionResponse(
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class AsaasWebhookPayload(
+    val id: String = "",           // Asaas event ID (evt_xxx) — used for idempotency
     val event: String,
     val payment: AsaasPayment? = null,
     val subscription: AsaasSubscription? = null

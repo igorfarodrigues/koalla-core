@@ -262,6 +262,7 @@ class BillingService(
      * Webhook SUBSCRIPTION_DELETED / SUBSCRIPTION_INACTIVATED:
      * - Marks subscription as CANCELED
      * - Deactivates user
+     * - Notifies user via WhatsApp
      */
     @Transactional
     fun handleSubscriptionDeleted(subscriptionId: String) {
@@ -271,9 +272,13 @@ class BillingService(
         subscriptionRepository.save(subscription)
 
         val user = userRepository.findById(subscription.userId).orElse(null)
-        if (user != null) {
+        if (user != null && user.isActive) {
             user.isActive = false
             userRepository.save(user)
+            logger.info("User ${user.waId} deactivated due to subscription deletion/inactivation")
+            runBlocking {
+                notifyAccessRevoked(user.waId)
+            }
         }
     }
 

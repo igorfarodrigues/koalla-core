@@ -62,7 +62,7 @@ class BillingWebhookController(
         }
 
         val event = payload.event
-        val eventId = "" // Would need to extract from raw payload
+        val eventId = payload.id
 
         // Idempotency check
         if (eventId.isNotEmpty() && billingService.isEventAlreadyProcessed(eventId)) {
