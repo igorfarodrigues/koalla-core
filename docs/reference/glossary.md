@@ -10,6 +10,9 @@ Componente de IA que processa mensagens do usuário e decide quais ações tomar
 **AgentContext**
 Objeto que contém o contexto da conversa atual (userId, conversationId, contactId, etc.) passado para as tools durante execução.
 
+**Asaas**
+Plataforma de pagamentos usada para gerenciar cobranças e assinaturas. Responsável por processar pagamentos PIX e cartão de crédito.
+
 ### C
 
 **CASH_IN**
@@ -42,6 +45,14 @@ Processo de transferir a conversa para atendimento humano quando o bot não cons
 **Function Calling**
 Capacidade do modelo de IA de chamar funções definidas (tools) durante a geração de resposta. Permite que o agente execute ações como registrar transações.
 
+### G
+
+**Gateway**
+Camada de abstração entre os services e APIs externas (Chatwoot, Asaas). Implementado em `gateway/`.
+
+**Grace Period**
+Período de carência após falha de pagamento antes de desativar a conta do usuário. Configurado em `grace_expires_at` na tabela de subscriptions.
+
 ### L
 
 **Label**
@@ -54,6 +65,9 @@ Tag aplicada às conversas no Chatwoot. Usada para controle de fluxo:
 Mecanismo que previne processamento paralelo da mesma conversa. Garante que apenas uma instância do agente responda por vez.
 
 ### M
+
+**Mapper**
+Componente responsável por converter entre entidades JPA e modelos de domínio. Implementado em `mapper/`.
 
 **MessageQueue**
 Fila de mensagens aguardando processamento. Usada para debounce de mensagens rápidas.
@@ -68,6 +82,17 @@ Identificador único de conversa, geralmente o número WhatsApp (wa_id). Usado c
 
 **Spring AI**
 Framework do Spring para integração com modelos de IA. Fornece abstrações para chat, embeddings e function calling.
+
+**Subscription**
+Registro de assinatura do usuário. Estados possíveis:
+- `TRIALING`: Período de teste
+- `ACTIVE`: Assinatura ativa
+- `PAST_DUE`: Pagamento atrasado (grace period)
+- `CANCELED`: Cancelado pelo usuário
+- `EXPIRED`: Expirado por falta de pagamento
+
+**SubStatus**
+Enum com os status possíveis de uma subscription: TRIALING, ACTIVE, PAST_DUE, CANCELED, EXPIRED.
 
 ### T
 

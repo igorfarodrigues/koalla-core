@@ -1,18 +1,10 @@
 package ai.koalla.core.entity
 
+import ai.koalla.core.domain.EntityContext
+import ai.koalla.core.domain.MovementType
 import jakarta.persistence.*
 import java.time.OffsetDateTime
 import java.util.UUID
-
-enum class MovementType {
-    CASH_IN,
-    CASH_OUT
-}
-
-enum class EntityContext {
-    PF,
-    PJ
-}
 
 @Entity
 @Table(name = "categories", schema = "koalla")

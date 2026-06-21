@@ -48,8 +48,14 @@ class BillingService(
 
     // ── Signup ────────────────────────────────────────────────────────────────
 
+    /**
+     * NOTE: This method is intentionally NOT suspend.
+     * Spring's @Transactional uses ThreadLocal, which is unsafe with coroutine suspension
+     * (the coroutine may resume on a different thread, losing the transaction context).
+     * Gateway calls (Asaas) are wrapped in runBlocking to bridge suspend → blocking.
+     */
     @Transactional
-    suspend fun startTrial(
+    fun startTrial(
         user: User,
         plan: String,
         cardData: CardData,
@@ -64,11 +70,13 @@ class BillingService(
         if (existingCustomer != null) {
             asaasCustomerId = existingCustomer.asaasCustomerId
         } else {
-            val customer = asaasGateway.getOrCreateCustomer(
-                name = user.fullName ?: "",
-                phone = user.waId,
-                email = user.email
-            )
+            val customer = runBlocking {
+                asaasGateway.getOrCreateCustomer(
+                    name = user.fullName ?: "",
+                    phone = user.waId,
+                    email = user.email
+                )
+            }
             asaasCustomerId = customer["id"] as String
             asaasCustomerRepository.save(
                 AsaasCustomer(userId = user.id, asaasCustomerId = asaasCustomerId)
@@ -76,13 +84,15 @@ class BillingService(
         }
 
         // 2. Asaas subscription
-        val subscriptionData = asaasGateway.createSubscription(
-            customerId = asaasCustomerId,
-            plan = planUpper,
-            cardData = cardData,
-            cardHolderInfo = cardHolderInfo,
-            trialDays = props.trialDays
-        )
+        val subscriptionData = runBlocking {
+            asaasGateway.createSubscription(
+                customerId = asaasCustomerId,
+                plan = planUpper,
+                cardData = cardData,
+                cardHolderInfo = cardHolderInfo,
+                trialDays = props.trialDays
+            )
+        }
 
         val asaasSubscriptionId = subscriptionData["id"] as String
         val trialEnd = LocalDate.now().plusDays(props.trialDays.toLong())
@@ -262,12 +272,15 @@ class BillingService(
 
     // ── Cancel user subscription ──────────────────────────────────────────────
 
+    /**
+     * NOTE: Not suspend — same reasoning as startTrial.
+     */
     @Transactional
-    suspend fun cancelUserSubscription(user: User): CancelResult {
+    fun cancelUserSubscription(user: User): CancelResult {
         val subscription = subscriptionRepository.findActiveByUserId(user.id)
             ?: throw SubscriptionNotFoundException(user.id.toString())
 
-        asaasGateway.cancelSubscription(subscription.asaasSubscriptionId!!)
+        runBlocking { asaasGateway.cancelSubscription(subscription.asaasSubscriptionId!!) }
 
         subscription.status = SubStatus.CANCELED
         subscriptionRepository.save(subscription)

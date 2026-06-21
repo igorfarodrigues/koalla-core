@@ -1,6 +1,6 @@
 package ai.koalla.core.tools
 
-import ai.koalla.core.entity.MovementType
+import ai.koalla.core.domain.MovementType
 import ai.koalla.core.entity.TransactionEntity
 import ai.koalla.core.repository.CategoryRepository
 import ai.koalla.core.repository.TransactionRepository

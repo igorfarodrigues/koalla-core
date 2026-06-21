@@ -14,14 +14,21 @@ Backend da assistente financeira Koalla via WhatsApp.
 ```
 src/main/kotlin/ai/koalla/core/
 ├── KoallaApplication.kt          # Entry point
+├── agent/                        # AI Agent (Spring AI - KoallaAgent)
+├── client/                       # External API Clients (Chatwoot, Asaas)
 ├── config/                       # Configuration classes
+├── controller/                   # REST Controllers
+├── domain/                       # Domain models (User, Transaction, AgentContext)
+├── dto/                          # Data Transfer Objects
 ├── entity/                       # JPA Entities
+├── exception/                    # Exception handling (GlobalExceptionHandler)
+├── gateway/                      # API Gateways (Asaas, Chatwoot)
+├── mapper/                       # Entity/Domain mappers
+├── observability/                # Metrics and monitoring
 ├── repository/                   # Spring Data Repositories
 ├── service/                      # Business Logic
-├── controller/                   # REST Controllers
-├── dto/                          # Data Transfer Objects
-├── client/                       # External API Clients (Chatwoot, Asaas)
-└── agent/                        # AI Agent (Spring AI)
+├── tools/                        # Spring AI function calling tools
+└── util/                         # Utilities (WebhookSecurity)
 ```
 
 ## Configuração
@@ -64,21 +71,22 @@ docker-compose up -d
 ## API Endpoints
 
 ### Health
-- `GET /health` — Status da API
+- `GET /actuator/health` — Status da API
 
 ### Webhooks
 - `POST /webhook/chatwoot` — Recebe eventos do Chatwoot
-- `POST /webhook/asaas` — Recebe eventos do Asaas
+- `POST /webhook/asaas` — Recebe eventos do Asaas (billing)
 
 ### Usuários
-- `GET /users/{waId}` — Busca usuário por WhatsApp ID
-- `PATCH /users/{userId}/deactivate` — Desativa usuário
-- `PATCH /users/{userId}/activate` — Ativa usuário
+- `GET /api/users/{waId}` — Busca usuário por WhatsApp ID
+- `PATCH /api/users/{userId}/deactivate` — Desativa usuário
+- `PATCH /api/users/{userId}/activate` — Ativa usuário
 
 ### Transações
-- `POST /transactions` — Cria transação
-- `GET /transactions/user/{userId}` — Lista transações do usuário
-- `DELETE /transactions/{id}` — Remove transação
+- `POST /api/transactions` — Cria transação
+- `GET /api/transactions/user/{userId}` — Lista transações do usuário
+- `GET /api/transactions/user/{userId}/summary` — Resumo mensal
+- `DELETE /api/transactions/{id}` — Remove transação
 
 ### Auth
 - `POST /auth/signup` — Cadastro com trial

@@ -1,7 +1,5 @@
 package ai.koalla.core.domain
 
-import ai.koalla.core.entity.EntityContext
-import ai.koalla.core.entity.MovementType
 import java.time.OffsetDateTime
 import java.util.UUID
 

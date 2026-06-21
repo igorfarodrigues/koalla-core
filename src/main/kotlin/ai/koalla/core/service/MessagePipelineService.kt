@@ -9,6 +9,7 @@ import ai.koalla.core.entity.MessageQueue
 import ai.koalla.core.gateway.ChatwootGateway
 import ai.koalla.core.observability.PipelineMetrics
 import ai.koalla.core.repository.*
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -25,7 +26,7 @@ import java.time.OffsetDateTime
  */
 @Service
 class MessagePipelineService(
-    private val userRepository: UserRepository,
+    private val userService: UserService,
     private val messageQueueRepository: MessageQueueRepository,
     private val conversationStatusRepository: ConversationStatusRepository,
     private val chatHistoryRepository: ChatHistoryRepository,
@@ -124,9 +125,9 @@ class MessagePipelineService(
         }
 
         // ── 5. Gate: user must be registered and active ────────────────────────
-        val userEntity = userRepository.findByWaId(waId)
+        val user = userService.findByWaId(waId)
 
-        if (userEntity == null) {
+        if (user == null) {
             metrics.messageBlocked("unregistered")
             if (conversationId != null) {
                 chatwootGateway.sendMessage(
@@ -138,7 +139,7 @@ class MessagePipelineService(
             return
         }
 
-        if (!userEntity.isActive) {
+        if (!user.isActive) {
             metrics.messageBlocked("inactive")
             if (conversationId != null) {
                 chatwootGateway.sendMessage(
@@ -226,13 +227,13 @@ class MessagePipelineService(
             ?.get("custom_attributes") as? Map<String, Any> ?: contactAttrs
 
         val agentContext = AgentContext(
-            userId = userEntity.id!!,
+            userId = user.id,
             waId = waId,
             accountId = accountId,
             conversationId = conversationId ?: 0,
             contactId = contactId ?: 0,
             messageId = messageId.toIntOrNull() ?: 0,
-            contactName = name ?: waId,
+            contactName = name ?: user.waId,
             labels = labels.toList(),
             contactCustomAttributes = contactCustomAttrs,
             alertConversationId = props.alertConversationId
@@ -249,7 +250,7 @@ class MessagePipelineService(
             unlockConversation(sessionId)
             throw e
         } finally {
-            metrics.agentTimer().record(System.nanoTime() - agentStart, java.util.concurrent.TimeUnit.NANOSECONDS)
+            metrics.agentTimer.record(System.nanoTime() - agentStart, TimeUnit.NANOSECONDS)
         }
 
         if (output.isNullOrEmpty() || output == "Agent stopped due to max iterations.") {

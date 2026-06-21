@@ -77,19 +77,49 @@ hikaricp_connections_active
 hikaricp_connections_pending
 ```
 
-### Custom Metrics (Futuro)
+### Custom Metrics
+
+Métricas customizadas implementadas em `observability/PipelineMetrics.kt`:
 
 ```kotlin
-// Exemplo de métrica customizada
 @Component
-class AgentMetrics(private val meterRegistry: MeterRegistry) {
-    private val agentCalls = meterRegistry.counter("koalla.agent.calls")
-    private val toolCalls = meterRegistry.counter("koalla.tools.calls", "tool", "name")
-    
-    fun recordAgentCall() = agentCalls.increment()
-    fun recordToolCall(toolName: String) = toolCalls.increment()
+class PipelineMetrics(private val registry: MeterRegistry) {
+
+    val agentTimer: Timer = Timer.builder("koalla.agent.duration")
+        .description("End-to-end agent + tool execution duration")
+        .register(registry)
+
+    fun messageProcessed(type: String = "text") {
+        Counter.builder("koalla.messages.processed")
+            .description("Messages delivered to the AI agent")
+            .tag("type", type)
+            .register(registry)
+            .increment()
+    }
+
+    fun messageBlocked(reason: String) {
+        Counter.builder("koalla.messages.blocked")
+            .description("Messages skipped before reaching the agent")
+            .tag("reason", reason)
+            .register(registry)
+            .increment()
+    }
+
+    fun pipelineError() {
+        Counter.builder("koalla.pipeline.errors")
+            .description("Unhandled exceptions in the message pipeline")
+            .register(registry)
+            .increment()
+    }
 }
 ```
+
+| Métrica | Tipo | Tags | Descrição |
+|---------|------|------|-----------|
+| `koalla.messages.processed` | Counter | type=text\|audio | Mensagens entregues ao agente |
+| `koalla.messages.blocked` | Counter | reason=label\|inactive\|unregistered | Mensagens bloqueadas antes do agente |
+| `koalla.pipeline.errors` | Counter | - | Exceções não tratadas no pipeline |
+| `koalla.agent.duration` | Timer | - | Duração end-to-end do agente + tools |
 
 ## Alertas
 

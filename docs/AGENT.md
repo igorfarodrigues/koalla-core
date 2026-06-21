@@ -10,12 +10,18 @@ koalla-core/
 │   ├── agent/           # LLM Agent (KoallaAgent.kt)
 │   ├── client/          # External API clients (Chatwoot, Asaas)
 │   ├── config/          # Spring configuration and properties
-│   ├── controller/      # REST API endpoints
+│   ├── controller/      # REST API endpoints (6 controllers)
+│   ├── domain/          # Domain models (User, Transaction, AgentContext)
 │   ├── dto/             # Data transfer objects
 │   ├── entity/          # JPA entities (database models)
+│   ├── exception/       # Exception handling (GlobalExceptionHandler)
+│   ├── gateway/         # API gateways (AsaasGateway, ChatwootGateway)
+│   ├── mapper/          # Entity/Domain mappers
+│   ├── observability/   # Metrics (PipelineMetrics)
 │   ├── repository/      # Spring Data JPA repositories
 │   ├── service/         # Business logic services
-│   └── tools/           # Spring AI function calling tools
+│   ├── tools/           # Spring AI function calling tools
+│   └── util/            # Utilities (WebhookSecurity)
 ├── docs/                # This documentation
 ├── migrations/          # SQL migration scripts
 └── build.gradle.kts     # Dependencies and build config
@@ -30,8 +36,13 @@ koalla-core/
 | Message processing pipeline | `service/MessagePipelineService.kt` |
 | AI Tools (8 functions) | `tools/*.kt` |
 | Chatwoot HTTP client | `client/ChatwootClient.kt` |
+| Chatwoot gateway | `gateway/ChatwootGateway.kt` |
 | Configuration | `config/KoallaConfig.kt` |
 | Webhook controller | `controller/WebhookController.kt` |
+| Billing webhook | `controller/BillingWebhookController.kt` |
+| Exception handling | `exception/GlobalExceptionHandler.kt` |
+| Pipeline metrics | `observability/PipelineMetrics.kt` |
+| Domain models | `domain/*.kt` |
 
 ## Critical Flows
 

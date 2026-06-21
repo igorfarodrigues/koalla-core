@@ -2,6 +2,7 @@ package ai.koalla.core.dto
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
+import jakarta.validation.Valid
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
@@ -23,7 +24,9 @@ data class SignupRequest(
     @field:Pattern(regexp = "^(STARTER|PRO|BUSINESS)$", message = "Invalid plan")
     val plan: String,
 
+    @field:Valid
     val card: CardData,
+    @field:Valid
     val cardHolderInfo: CardHolderInfo
 )
 

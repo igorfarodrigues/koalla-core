@@ -15,7 +15,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.servlet.http.HttpServletRequest
-import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -122,7 +121,7 @@ class BillingWebhookController(
         val user = userService.findByWaId(waId) ?: throw UserNotFoundException(waId)
 
         // SubscriptionNotFoundException → 400 via GlobalExceptionHandler
-        val result = runBlocking { billingService.cancelUserSubscription(user) }
+        val result = billingService.cancelUserSubscription(user)
 
         return ResponseEntity.ok(
             CancelSubscriptionResponse(success = result.success, subscriptionId = result.subscriptionId)

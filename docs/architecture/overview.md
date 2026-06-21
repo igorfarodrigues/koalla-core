@@ -33,14 +33,20 @@ API backend do Koalla, assistente financeira pessoal via WhatsApp. Recebe webhoo
 │                        Tools                                 │
 │  (Spring AI functions for agent)                            │
 ├─────────────────────────────────────────────────────────────┤
+│                       Gateways                               │
+│  (API gateway abstractions - Chatwoot, Asaas)               │
+├─────────────────────────────────────────────────────────────┤
 │                       Clients                                │
 │  (External API integrations)                                │
 ├─────────────────────────────────────────────────────────────┤
 │                    Repositories                              │
 │  (Data access layer)                                        │
 ├─────────────────────────────────────────────────────────────┤
-│                      Entities                                │
-│  (JPA domain models)                                        │
+│                 Entities / Domain                            │
+│  (JPA models + domain models)                               │
+├─────────────────────────────────────────────────────────────┤
+│              Exception / Observability                       │
+│  (Error handling + metrics)                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -48,14 +54,17 @@ API backend do Koalla, assistente financeira pessoal via WhatsApp. Recebe webhoo
 
 ### 1. Controllers (`controller/`)
 - **WebhookController**: Recebe webhooks do Chatwoot
+- **BillingWebhookController**: Recebe webhooks do Asaas (billing)
 - **UserController**: CRUD de usuários
 - **TransactionController**: CRUD de transações
+- **AuthController**: Autenticação e signup
 - **HealthController**: Health check e status
 
 ### 2. Services (`service/`)
 - **MessagePipelineService**: Pipeline completo de processamento
 - **TransactionService**: Lógica de transações financeiras
 - **BillingService**: Gestão de cobrança e assinaturas
+- **UserService**: Lógica de usuários
 - **AudioService**: Transcrição de áudio via Whisper
 
 ### 3. Agent (`agent/`)
@@ -66,13 +75,41 @@ API backend do Koalla, assistente financeira pessoal via WhatsApp. Recebe webhoo
 - **ChatwootTools**: send_text, react, preferences, alerts
 - **EscalationTools**: escalate_to_human
 - **ToolContextHolder**: Contexto thread-safe para tools
+- **FunctionCallbacksConfig**: Configuração dos callbacks
 
-### 5. Clients (`client/`)
+### 5. Gateways (`gateway/`)
+- **ChatwootGateway**: Abstração para API Chatwoot
+- **AsaasGateway**: Abstração para API Asaas
+
+### 6. Clients (`client/`)
 - **ChatwootClient**: API Chatwoot (mensagens, contatos, labels)
 - **AsaasClient**: API Asaas (cobranças PIX)
 
-### 6. Entities (`entity/`)
-- User, Transaction, Category, ChatHistory, MessageQueue, ConversationStatus
+### 7. Domain (`domain/`)
+- **User**: Modelo de domínio do usuário
+- **Transaction**: Modelo de domínio de transação
+- **TransactionEnums**: Enums (Movement, EntityType)
+- **AgentContext**: Contexto do agente durante execução
+
+### 8. Entities (`entity/`)
+- **UserEntities**: User JPA entity
+- **TransactionEntities**: Transaction, Category entities
+- **MessageEntities**: ChatHistory, MessageQueue, ConversationStatus
+- **BillingEntities**: Subscription, Payment entities
+
+### 9. Exception (`exception/`)
+- **GlobalExceptionHandler**: Handler global de exceções
+- **KoallaExceptions**: Exceções customizadas do domínio
+
+### 10. Mappers (`mapper/`)
+- **UserMapper**: Conversão User entity ↔ domain
+- **TransactionMapper**: Conversão Transaction entity ↔ domain
+
+### 11. Observability (`observability/`)
+- **PipelineMetrics**: Métricas do pipeline de processamento
+
+### 12. Util (`util/`)
+- **WebhookSecurity**: Validação de webhooks
 
 ## Integrações Externas
 
@@ -103,9 +140,13 @@ Ver [data-model.md](./data-model.md) para detalhes do schema.
 
 - **Repository Pattern**: Acesso a dados via Spring Data JPA
 - **Service Layer**: Lógica de negócio isolada
+- **Gateway Pattern**: Abstração para APIs externas
+- **Mapper Pattern**: Conversão entre entidades e modelos de domínio
 - **Function Calling**: Tools como beans Spring AI
 - **Thread-Local Context**: Contexto do agente durante execução
 - **Async Processing**: Webhooks processados assincronamente
 - **Debounce Pattern**: Agregação de mensagens rápidas
 - **Lock Pattern**: Evita respostas duplicadas por conversa
+- **Global Exception Handler**: Tratamento centralizado de erros
+- **Domain Model**: Separação entre entidades JPA e modelos de domínio
 

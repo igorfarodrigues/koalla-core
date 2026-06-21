@@ -1,7 +1,7 @@
 package ai.koalla.core.dto
 
-import ai.koalla.core.entity.EntityContext
-import ai.koalla.core.entity.MovementType
+import ai.koalla.core.domain.EntityContext
+import ai.koalla.core.domain.MovementType
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Positive
 import java.time.OffsetDateTime

@@ -3,7 +3,7 @@ package ai.koalla.core.service
 import ai.koalla.core.domain.Transaction
 import ai.koalla.core.dto.TransactionCreateRequest
 import ai.koalla.core.dto.TransactionSummary
-import ai.koalla.core.entity.MovementType
+import ai.koalla.core.domain.MovementType
 import ai.koalla.core.entity.TransactionEntity
 import ai.koalla.core.mapper.toDomain
 import ai.koalla.core.repository.CategoryRepository

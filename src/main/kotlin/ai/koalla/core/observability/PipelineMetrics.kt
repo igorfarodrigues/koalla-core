@@ -4,7 +4,6 @@ import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.springframework.stereotype.Component
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Micrometer metrics for the WhatsApp message pipeline.
@@ -20,7 +19,10 @@ import java.util.concurrent.ConcurrentHashMap
 @Component
 class PipelineMetrics(private val registry: MeterRegistry) {
 
-    private val timers = ConcurrentHashMap<String, Timer>()
+    // Micrometer's register() is idempotent — no need for a ConcurrentHashMap cache
+    val agentTimer: Timer = Timer.builder("koalla.agent.duration")
+        .description("End-to-end agent + tool execution duration")
+        .register(registry)
 
     // ── Counters ──────────────────────────────────────────────────────────────
 
@@ -45,13 +47,5 @@ class PipelineMetrics(private val registry: MeterRegistry) {
             .description("Unhandled exceptions in the message pipeline")
             .register(registry)
             .increment()
-    }
-
-    // ── Timers ────────────────────────────────────────────────────────────────
-
-    fun agentTimer(): Timer = timers.getOrPut("agent") {
-        Timer.builder("koalla.agent.duration")
-            .description("End-to-end agent + tool execution duration")
-            .register(registry)
     }
 }

@@ -99,6 +99,69 @@ Content-Type: application/json
 
 ---
 
+#### POST /webhook/asaas
+
+Recebe eventos de billing do Asaas.
+
+**Headers:**
+```http
+Content-Type: application/json
+asaas-access-token: {webhook_token}
+```
+
+**Eventos tratados:**
+- `PAYMENT_CONFIRMED` / `PAYMENT_RECEIVED` → Ativa usuário
+- `PAYMENT_OVERDUE` / `PAYMENT_CREDIT_CARD_CAPTURE_REFUSED` → Marca atraso
+- `SUBSCRIPTION_DELETED` / `SUBSCRIPTION_INACTIVATED` → Cancela assinatura
+
+**Request Body:**
+```json
+{
+  "id": "evt_123456789",
+  "event": "PAYMENT_CONFIRMED",
+  "payment": {
+    "id": "pay_123456789",
+    "subscription": "sub_123456789"
+  }
+}
+```
+
+**Response 200:**
+```json
+{
+  "status": "ok",
+  "event": "PAYMENT_CONFIRMED"
+}
+```
+
+**Response 401:**
+```json
+{
+  "error": "Invalid webhook token"
+}
+```
+
+---
+
+#### POST /webhook/cancel-subscription/{waId}
+
+Cancela a assinatura de um usuário.
+
+**Headers:**
+```http
+X-Koalla-Secret: {secret}
+```
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "subscriptionId": "sub_123456789"
+}
+```
+
+---
+
 ### Users
 
 #### GET /api/users/{waId}
@@ -240,6 +303,92 @@ Resumo mensal de transações.
     "Transporte": 89500,
     "Mercado": 100000
   }
+}
+```
+
+---
+
+### Auth
+
+#### POST /auth/signup
+
+Cadastro de novo usuário com trial.
+
+**Request Body:**
+```json
+{
+  "waId": "+5531999999999",
+  "fullName": "João Silva",
+  "email": "joao@email.com",
+  "plan": "monthly",
+  "card": {
+    "holderName": "JOAO SILVA",
+    "number": "4111111111111111",
+    "expiryMonth": "12",
+    "expiryYear": "2025",
+    "ccv": "123"
+  },
+  "cardHolderInfo": {
+    "name": "João Silva",
+    "email": "joao@email.com",
+    "cpfCnpj": "12345678901",
+    "postalCode": "30130000",
+    "addressNumber": "123",
+    "phone": "31999999999"
+  }
+}
+```
+
+**Response 200 (sucesso):**
+```json
+{
+  "subscriptionId": "sub_123456789",
+  "trialEndDate": "2024-02-14",
+  "plan": "monthly",
+  "waLink": "https://wa.me/5531988888888?text=Oi%20Koalla!%20Acabei%20de%20me%20cadastrar%20%F0%9F%90%A8"
+}
+```
+
+**Response 200 (já cadastrado):**
+```json
+{
+  "success": false,
+  "detail": "already_registered",
+  "waLink": "https://wa.me/5531988888888?text=Oi+Koalla!"
+}
+```
+
+**Response 422:**
+```json
+{
+  "error": "Failed to process payment"
+}
+```
+
+---
+
+#### GET /auth/status/{waId}
+
+Verifica status de cadastro do usuário.
+
+**Parameters:**
+| Nome | Tipo | Descrição |
+|------|------|-----------|
+| waId | string | WhatsApp ID (path) |
+
+**Response 200:**
+```json
+{
+  "waId": "+5531999999999",
+  "isActive": true,
+  "planType": "MONTHLY"
+}
+```
+
+**Response 404:**
+```json
+{
+  "error": "User not found"
 }
 ```
 

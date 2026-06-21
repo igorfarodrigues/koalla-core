@@ -8,11 +8,9 @@ import ai.koalla.core.repository.AuthRepository
 import ai.koalla.core.service.BillingService
 import ai.koalla.core.service.UserService
 import jakarta.validation.Valid
-import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -33,7 +31,6 @@ class AuthController(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @PostMapping("/signup")
-    @Transactional
     fun signup(
         @Valid @RequestBody body: SignupRequest
     ): ResponseEntity<Any> {
@@ -69,14 +66,12 @@ class AuthController(
         }
 
         return try {
-            val billing = runBlocking {
-                billingService.startTrial(
-                    user = user,
-                    plan = body.plan,
-                    cardData = body.card,
-                    cardHolderInfo = body.cardHolderInfo
-                )
-            }
+            val billing = billingService.startTrial(
+                user = user,
+                plan = body.plan,
+                cardData = body.card,
+                cardHolderInfo = body.cardHolderInfo
+            )
             ResponseEntity.ok(SignupResponse(
                 subscriptionId = billing.subscriptionId,
                 trialEndDate = billing.trialEndDate,

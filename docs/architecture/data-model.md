@@ -117,14 +117,27 @@ CREATE TABLE koalla.conversation_status (
 ## Relacionamentos
 
 ```
-┌──────────────┐       ┌──────────────┐
-│    users     │───┬──▶│ transactions │
-└──────────────┘   │   └──────────────┘
-                   │          │
-                   │          ▼
-                   │   ┌──────────────┐
-                   └──▶│  categories  │
-                       └──────────────┘
+┌──────────────────┐       ┌──────────────────┐
+│      users       │───┬──▶│   transactions   │
+└──────────────────┘   │   └──────────────────┘
+         │             │          │
+         │             │          ▼
+         │             │   ┌──────────────────┐
+         │             └──▶│    categories    │
+         │                 └──────────────────┘
+         │
+         ├───────────────▶ ┌──────────────────┐
+         │                 │  subscriptions   │
+         │                 └──────────────────┘
+         │                          │
+         │                          ▼
+         │                 ┌──────────────────┐
+         ├───────────────▶ │     invoices     │
+         │                 └──────────────────┘
+         │
+         └───────────────▶ ┌──────────────────┐
+                           │ asaas_customers  │
+                           └──────────────────┘
 ```
 
 ## Índices Recomendados
@@ -145,5 +158,68 @@ CREATE INDEX idx_message_queue_wa_id ON koalla.message_queue(wa_id);
 
 Os scripts de migração estão em `/migrations/`:
 - `initial_schema.sql` — Schema inicial completo
-- `002_billing_grace_idempotency.sql` — Tabelas de billing
+- `002_billing_grace_idempotency.sql` — Grace period e idempotência de webhooks
+
+## Entidades de Billing
+
+### asaas_customers
+Mapeamento entre usuários e clientes Asaas.
+
+```sql
+CREATE TABLE koalla.asaas_customers (
+    user_id UUID PRIMARY KEY,
+    asaas_customer_id VARCHAR(50) UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### subscriptions
+Assinaturas dos usuários.
+
+```sql
+CREATE TABLE koalla.subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    asaas_subscription_id VARCHAR(50) UNIQUE,
+    status VARCHAR(20) DEFAULT 'TRIALING',  -- TRIALING, ACTIVE, PAST_DUE, CANCELED, EXPIRED
+    plan_name VARCHAR(50),
+    next_due_date DATE,
+    grace_expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| status | VARCHAR | TRIALING, ACTIVE, PAST_DUE, CANCELED, EXPIRED |
+| grace_expires_at | TIMESTAMPTZ | Data limite do período de carência |
+
+### invoices
+Faturas e pagamentos.
+
+```sql
+CREATE TABLE koalla.invoices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    subscription_id UUID,
+    asaas_payment_id VARCHAR(50) UNIQUE,
+    amount DECIMAL(12,2) NOT NULL,
+    status VARCHAR(30),
+    pix_code TEXT,
+    payment_link TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### webhook_events
+Idempotência para webhooks do Asaas.
+
+```sql
+CREATE TABLE koalla.webhook_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id VARCHAR(200) UNIQUE NOT NULL,
+    event_type VARCHAR(100) NOT NULL,
+    processed_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
 

@@ -149,6 +149,67 @@ services:
           memory: 1G
 ```
 
+### 6. Problemas com Billing/Assinaturas
+
+**Sintomas**: Usuário reporta que está ativo mas não consegue usar o serviço
+
+**Verificar**:
+```sql
+-- Verificar status da subscription
+SELECT u.wa_id, u.is_active, s.status, s.grace_expires_at, s.next_due_date
+FROM koalla.users u
+LEFT JOIN koalla.subscriptions s ON u.id = s.user_id
+WHERE u.wa_id = '5531999999999';
+
+-- Verificar pagamentos recentes
+SELECT * FROM koalla.invoices 
+WHERE user_id = (SELECT id FROM koalla.users WHERE wa_id = '5531999999999')
+ORDER BY created_at DESC LIMIT 5;
+
+-- Verificar webhooks processados
+SELECT * FROM koalla.webhook_events 
+ORDER BY processed_at DESC LIMIT 10;
+```
+
+**Causas comuns**:
+- Webhook do Asaas não chegou
+- Subscription em status PAST_DUE (grace period expirado)
+- Evento de pagamento duplicado ignorado
+
+**Ações corretivas**:
+```sql
+-- Reativar usuário manualmente (emergência)
+UPDATE koalla.users SET is_active = true WHERE wa_id = '5531999999999';
+
+-- Atualizar status da subscription
+UPDATE koalla.subscriptions 
+SET status = 'ACTIVE', grace_expires_at = NULL 
+WHERE user_id = (SELECT id FROM koalla.users WHERE wa_id = '5531999999999');
+```
+
+### 7. Webhook do Asaas não processado
+
+**Sintomas**: Pagamento confirmado no Asaas mas usuário não ativado
+
+**Verificar**:
+```bash
+# Logs de webhook
+docker-compose logs api | grep "asaas" | tail -50
+
+# Verificar se evento foi processado
+```
+
+```sql
+SELECT * FROM koalla.webhook_events 
+WHERE event_id LIKE '%payment%' 
+ORDER BY processed_at DESC LIMIT 10;
+```
+
+**Causas comuns**:
+- Token de webhook incorreto (retorno 401)
+- Evento já processado (idempotência)
+- Erro ao mapear subscriptionId
+
 ## Procedimentos de Emergência
 
 ### Desligar o Bot
@@ -171,6 +232,22 @@ DELETE FROM koalla.message_queue WHERE wa_id = '+5531999999999';
 
 -- Limpar lock
 DELETE FROM koalla.conversation_status WHERE session_id = '+5531999999999';
+```
+
+### Reativar Subscription (Emergência)
+
+```sql
+-- Verificar estado atual
+SELECT u.id, u.wa_id, u.is_active, s.status, s.asaas_subscription_id
+FROM koalla.users u
+LEFT JOIN koalla.subscriptions s ON u.id = s.user_id
+WHERE u.wa_id = '5531999999999';
+
+-- Reativar (usar com cautela - verificar no Asaas antes)
+UPDATE koalla.users SET is_active = true WHERE wa_id = '5531999999999';
+UPDATE koalla.subscriptions 
+SET status = 'ACTIVE', grace_expires_at = NULL 
+WHERE user_id = (SELECT id FROM koalla.users WHERE wa_id = '5531999999999');
 ```
 
 ### Backup do Banco
