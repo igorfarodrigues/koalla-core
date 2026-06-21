@@ -3,17 +3,10 @@ package ai.koalla.core.repository
 import ai.koalla.core.entity.ChatHistory
 import ai.koalla.core.entity.ConversationStatus
 import ai.koalla.core.entity.MessageQueue
-import ai.koalla.core.entity.WpMessageHistory
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
-import java.util.UUID
-
-@Repository
-interface WpMessageHistoryRepository : JpaRepository<WpMessageHistory, UUID> {
-    fun findByUserId(userId: UUID): List<WpMessageHistory>
-}
 
 @Repository
 interface MessageQueueRepository : JpaRepository<MessageQueue, Long> {

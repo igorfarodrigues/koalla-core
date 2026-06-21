@@ -75,7 +75,6 @@ API backend do Koalla, assistente financeira pessoal via WhatsApp. Recebe webhoo
 - **ChatwootTools**: send_text, react, preferences, alerts
 - **EscalationTools**: escalate_to_human
 - **ToolContextHolder**: Contexto thread-safe para tools
-- **FunctionCallbacksConfig**: Configuração dos callbacks
 
 ### 5. Gateways (`gateway/`)
 - **ChatwootGateway**: Abstração para API Chatwoot
@@ -88,22 +87,25 @@ API backend do Koalla, assistente financeira pessoal via WhatsApp. Recebe webhoo
 ### 7. Domain (`domain/`)
 - **User**: Modelo de domínio do usuário
 - **Transaction**: Modelo de domínio de transação
-- **TransactionEnums**: Enums (Movement, EntityType)
+- **TransactionEnums**: Enums (MovementType, EntityContext)
+- **Billing**: Modelos de domínio de billing (Subscription, Invoice)
+- **BillingEnums**: Enum SubscriptionStatus
 - **AgentContext**: Contexto do agente durante execução
 
 ### 8. Entities (`entity/`)
-- **UserEntities**: User JPA entity
+- **UserEntities**: User, Auth JPA entities
 - **TransactionEntities**: Transaction, Category entities
 - **MessageEntities**: ChatHistory, MessageQueue, ConversationStatus
-- **BillingEntities**: Subscription, Payment entities
+- **BillingEntities**: AsaasCustomer, Subscription, Invoice, WebhookEvent
 
 ### 9. Exception (`exception/`)
 - **GlobalExceptionHandler**: Handler global de exceções
 - **KoallaExceptions**: Exceções customizadas do domínio
 
 ### 10. Mappers (`mapper/`)
-- **UserMapper**: Conversão User entity ↔ domain
-- **TransactionMapper**: Conversão Transaction entity ↔ domain
+- **UserMapper**: Conversão User entity ↔ domain ↔ response
+- **TransactionMapper**: Conversão Transaction entity ↔ domain ↔ response
+- **BillingMapper**: Conversão Billing entities ↔ domain
 
 ### 11. Observability (`observability/`)
 - **PipelineMetrics**: Métricas do pipeline de processamento

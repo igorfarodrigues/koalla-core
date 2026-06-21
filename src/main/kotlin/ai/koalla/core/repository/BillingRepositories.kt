@@ -11,12 +11,10 @@ import java.util.UUID
 @Repository
 interface AsaasCustomerRepository : JpaRepository<AsaasCustomer, UUID> {
     fun findByUserId(userId: UUID): AsaasCustomer?
-    fun findByAsaasCustomerId(asaasCustomerId: String): AsaasCustomer?
 }
 
 @Repository
 interface SubscriptionRepository : JpaRepository<Subscription, UUID> {
-    fun findByUserId(userId: UUID): List<Subscription>
     fun findByAsaasSubscriptionId(asaasSubscriptionId: String): Subscription?
 
     @Query("""
@@ -42,9 +40,7 @@ interface SubscriptionRepository : JpaRepository<Subscription, UUID> {
 
 @Repository
 interface InvoiceRepository : JpaRepository<Invoice, UUID> {
-    fun findByUserId(userId: UUID): List<Invoice>
     fun findByAsaasPaymentId(asaasPaymentId: String): Invoice?
-    fun findBySubscriptionId(subscriptionId: UUID): List<Invoice>
 }
 
 @Repository

@@ -64,24 +64,3 @@ class AuthEntity(
     var createdAt: OffsetDateTime = OffsetDateTime.now()
 )
 
-@Entity
-@Table(name = "user_states", schema = "koalla")
-class UserStateEntity(
-    @Id
-    @Column(name = "user_id")
-    var userId: UUID,
-
-    @Column(name = "current_state", length = 50)
-    var currentState: String = "IDLE",
-
-    @Column(columnDefinition = "TEXT")
-    var content: String? = null,
-
-    @Column(name = "updated_at")
-    var updatedAt: OffsetDateTime = OffsetDateTime.now()
-) {
-    @PreUpdate
-    fun preUpdate() {
-        updatedAt = OffsetDateTime.now()
-    }
-}

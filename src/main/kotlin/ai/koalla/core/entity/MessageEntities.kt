@@ -2,27 +2,6 @@ package ai.koalla.core.entity
 
 import jakarta.persistence.*
 import java.time.OffsetDateTime
-import java.util.UUID
-
-@Entity
-@Table(name = "wp_message_history", schema = "koalla")
-class WpMessageHistory(
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    var id: UUID? = null,
-
-    @Column(name = "user_id")
-    var userId: UUID? = null,
-
-    @Column(length = 10, nullable = false)
-    var direction: String, // INBOUND | OUTBOUND
-
-    @Column(columnDefinition = "jsonb")
-    var metadata: String = "{}",
-
-    @Column(name = "created_at", updatable = false)
-    var createdAt: OffsetDateTime = OffsetDateTime.now()
-)
 
 @Entity
 @Table(name = "message_queue", schema = "koalla")

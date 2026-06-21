@@ -62,21 +62,6 @@ data class SignupResponse(
     val waLink: String
 )
 
-data class MagicLinkRequest(
-    @field:Email
-    val email: String
-)
-
-data class MagicLinkVerifyRequest(
-    @field:NotBlank
-    val token: String
-)
-
-data class AuthTokenResponse(
-    val accessToken: String,
-    val tokenType: String = "Bearer",
-    val expiresIn: Long
-)
 
 // ===================== Billing DTOs =====================
 

@@ -23,7 +23,11 @@ import java.time.format.DateTimeFormatter
  * Koalla — the intelligent financial assistant via WhatsApp.
  * Implemented with Spring AI and OpenAI function calling.
  *
- * Function calling is configured via @Bean functions with @Description in FunctionCallbacksConfig.
+ * Function calling is configured via @Bean functions with @Description in dedicated tool classes:
+ *   - TransactionTools: register, list, summary
+ *   - ChatwootTools: sendText, react, preferences, alerts
+ *   - EscalationTools: escalateToHuman
+ *
  * Spring AI auto-discovers these functions and makes them available to the ChatClient.
  */
 @Component

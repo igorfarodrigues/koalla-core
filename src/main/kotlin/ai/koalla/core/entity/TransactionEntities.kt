@@ -20,19 +20,6 @@ class CategoryEntity(
     var userId: UUID? = null
 )
 
-@Entity
-@Table(name = "category_keywords", schema = "koalla")
-class CategoryKeywordEntity(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    var id: Int? = null,
-
-    @Column(length = 50, nullable = false)
-    var keyword: String,
-
-    @Column(name = "category_id", nullable = false)
-    var categoryId: Int
-)
 
 @Entity
 @Table(name = "transactions", schema = "koalla")
