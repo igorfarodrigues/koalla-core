@@ -54,7 +54,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-quartz")
 
     // OpenAPI / Swagger UI
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
 
     // Observability — Micrometer + Prometheus
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
