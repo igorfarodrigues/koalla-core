@@ -38,7 +38,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: steps.check-jacoco.outputs.report_exists == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: build/reports/jacoco/test/
@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload test results (on failure)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: build/reports/tests/test/
