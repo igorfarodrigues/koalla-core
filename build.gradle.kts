@@ -65,7 +65,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("com.h2database:h2")
-    testImplementation("io.mockk:mockk:1.13.13")
+    testImplementation("io.mockk:mockk:1.14.11")
     testImplementation("org.amshove.kluent:kluent:1.73")
     testImplementation("org.wiremock:wiremock-standalone:3.13.2")
     testImplementation("org.awaitility:awaitility-kotlin:4.3.0")
